@@ -40,7 +40,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body className="font-sans antialiased overflow-y-hidden">
         <Header />
-        <main className='h-[calc(100vh-3rem)] overflow-y-auto'>
+        <main className='h-[calc(100vh-3rem)] overflow-y-auto custom-scrollbar scrollbar-gutter-[stable]'>
           {children}
         </main>
         {/* <Footer /> */}

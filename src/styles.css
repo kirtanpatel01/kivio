@@ -19,6 +19,7 @@
   --secondary: var(--color-zinc-300);
   --foreground-secondary: var(--color-zinc-500);
   --border: var(--color-zinc-300);
+
 }
 
 @media (prefers-color-scheme: dark) {
@@ -42,4 +43,28 @@ body,
   min-height: 100%;
   background-color: var(--background);
   color: var(--foreground);
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--secondary);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+  opacity: 0.8;
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--secondary) transparent;
 }

@@ -74,7 +74,7 @@ export default function ThemeToggle() {
       onClick={toggleMode}
       aria-label={label}
       title={label}
-      className="rounded-full bg-secondary/60 hover:bg-secondary p-2 transition cursor-pointer"
+      className="rounded-full sm:bg-secondary/60 sm:hover:bg-secondary sm:p-2 transition cursor-pointer"
     >
       {mode === 'auto' ? <IconDeviceDesktop size={16} /> : mode === 'dark' ? <IconMoon size={16} /> : <IconSun size={16} />}
     </button>
