@@ -11,25 +11,25 @@ export default function Header() {
           </Link>
         </h2>
 
-        <div className="flex gap-4 font-semibold">
+        <div className="flex gap-16 font-semibold">
           <Link
             to="/"
-            className="hover:text-primary"
-            activeProps={{ className: "text-primary" }}
+            className="hover:text-primary hover:bg-secondary/50 px-2 py-1 rounded-lg"
+            activeProps={{ className: "text-primary bg-secondary/50" }}
           >
             Home
           </Link>
           <Link
             to="/channels"
-            className="hover:text-primary"
-            activeProps={{ className: "text-primary" }}
+            className="hover:text-primary hover:bg-secondary/50 px-2 py-1 rounded-lg"
+            activeProps={{ className: "text-primary bg-secondary/50" }}
           >
-            About
+            Channels
           </Link>
           <Link
             to="/history"
-            className="hover:text-primary"
-            activeProps={{ className: "text-primary" }}
+            className="hover:text-primary hover:bg-secondary/50 px-2 py-1 rounded-lg"
+            activeProps={{ className: "text-primary bg-secondary/50" }}
           >
             History
           </Link>
