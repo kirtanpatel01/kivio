@@ -114,8 +114,8 @@ function RouteComponent() {
       </div>
 
       {/* RIGHT SECTION: Suggestions (Scrollable) */}
-      <div className="hidden lg:flex flex-col w-[400px] h-full overflow-y-auto custom-scrollbar bg-secondary/5 p-4 space-y-4">
-        <h3 className="font-black text-sm uppercase tracking-widest text-foreground-secondary px-2">
+      <div className="hidden lg:flex flex-col w-[400px] h-full overflow-y-auto custom-scrollbar bg-secondary/5 px-2 py-4 space-y-4">
+        <h3 className="font-black text-sm tracking-widest text-foreground-secondary px-2">
           Suggested Videos
         </h3>
 
