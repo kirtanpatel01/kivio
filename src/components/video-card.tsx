@@ -5,7 +5,7 @@ function VideoCard() {
       {/* Thumbnail Container */}
       <div className="relative w-full aspect-video overflow-hidden rounded-2xl">
         <img
-          src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQp91mofXYaK8RLg8wYKiFzIhiRNuiHabvtjg&s"
+          src="https://i.ytimg.com/vi/s4I4JtOZNgg/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLCuTGVp21C1lFY1HWGSufmDScQ7XQ"
           alt="Video Thumbnail"
           className="w-full h-full object-cover group-hover:scale-[1.01] transition-transform duration-300 z-20"
         />
