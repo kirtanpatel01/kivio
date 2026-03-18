@@ -15,7 +15,7 @@ function RouteComponent() {
       {/* LEFT SECTION: Player & Details (Scrollable) */}
       <div className="flex-1 h-full overflow-y-auto custom-scrollbar border-r border-border">
         <div className="max-w-7xl mx-auto p-3 sm:p-4 space-y-6">
-          <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl">
+          <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-2xl">
             <iframe
               src="https://www.youtube.com/embed/3MDl6r1B6Z8?si=77g0VUwNjxpAQRtQ"
               title="YouTube video player"
@@ -30,7 +30,7 @@ function RouteComponent() {
             {/* Video Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
               <div className="flex flex-col gap-4">
-                <h1 className="text-xl sm:text-2xl font-black leading-tight">
+                <h1 className="text-xl sm:text-2xl font-semibold leading-tight">
                   How to use tailwind and motion to create super cool UI
                 </h1>
 
@@ -42,7 +42,7 @@ function RouteComponent() {
                       className="w-12 h-12 rounded-full border-2 border-transparent group-hover:border-primary transition-all"
                     />
                     <div>
-                      <h2 className="font-bold text-sm sm:text-base">
+                      <h2 className="font-semibold text-sm sm:text-base">
                         Manu Paji
                       </h2>
                       <p className="text-xs text-foreground-secondary tracking-wider">
@@ -52,7 +52,7 @@ function RouteComponent() {
                   </div>
 
                   <div className="border-l border-primary/30 pl-4 flex flex-col gap-0.5 text-sm">
-                    <span className="font-bold">100k views</span>
+                    <span className="font-semibold">100k views</span>
                     <span className="text-xs text-foreground-secondary italic">
                       Published on 2026-03-17
                     </span>
@@ -62,7 +62,7 @@ function RouteComponent() {
 
               <button
                 onClick={() => setShowDescription(!showDescription)}
-                className={`px-5 py-2 rounded-full transition-all duration-300 flex items-center gap-2 cursor-pointer text-sm font-bold border ${
+                className={`px-5 py-2 rounded-full transition-all duration-300 flex items-center gap-2 cursor-pointer text-sm font-semibold border ${
                   showDescription
                     ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
                     : "bg-secondary/40 hover:bg-secondary border-transparent"
@@ -85,7 +85,7 @@ function RouteComponent() {
               }`}
             >
               <div className="prose prose-sm dark:prose-invert max-w-none text-foreground-secondary leading-relaxed">
-                <p className="font-bold text-foreground mb-2">
+                <p className="font-semibold text-foreground mb-2">
                   About this video:
                 </p>
                 In this detailed tutorial, we dive deep into the world of
@@ -115,7 +115,7 @@ function RouteComponent() {
 
       {/* RIGHT SECTION: Suggestions (Scrollable) */}
       <div className="hidden lg:flex flex-col w-[400px] h-full overflow-y-auto custom-scrollbar bg-secondary/5 px-2 py-4 space-y-4">
-        <h3 className="font-black text-sm tracking-widest text-foreground-secondary px-2">
+        <h3 className="font-semibold text-sm tracking-widest text-foreground-secondary px-2">
           Suggested Videos
         </h3>
 
@@ -133,14 +133,14 @@ function RouteComponent() {
                     alt="Suggested video"
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                   />
-                  <div className="absolute bottom-1 right-1 px-1 py-0.5 bg-black/80 text-[10px] font-bold text-white rounded">
+                  <div className="absolute bottom-1 right-1 px-1 py-0.5 bg-black/80 text-[10px] font-semibold text-white rounded">
                     12:05
                   </div>
                 </div>
 
                 {/* Suggestions Info */}
                 <div className="flex flex-col gap-1 overflow-hidden pointer-events-none">
-                  <h4 className="text-xs sm:text-sm font-bold line-clamp-2 leading-tight group-hover:text-primary transition-colors">
+                  <h4 className="text-xs sm:text-sm font-semibold line-clamp-2 leading-tight group-hover:text-primary transition-colors">
                     Mastering the Art of Modern Web Design: Episode {i + 1}
                   </h4>
                   <div className="flex flex-col">

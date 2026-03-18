@@ -55,6 +55,8 @@ function RouteComponent() {
     setEditingId(null);
   };
 
+  console.log(channels)
+
   return (
     <div className="min-h-[calc(100vh-3rem)]">
       <div className="w-full h-[calc(100vh-3rem)] max-w-xl mx-auto bg-secondary/15 p-4 space-y-6 text-foreground">
