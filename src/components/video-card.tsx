@@ -1,7 +1,7 @@
 function VideoCard() {
   return (
     <div className="w-full group cursor-pointer flex flex-col gap-3 relative">
-      <div className="w-full h-full inset-0 absolute group-hover:bg-primary/10 z-10 group-hover:scale-[1.05] rounded-xl transition-all duration-300" />
+      <div className="w-full h-full inset-0 absolute group-hover:bg-primary/10 z-0 group-hover:scale-[1.05] rounded-xl transition-all duration-300" />
       {/* Thumbnail Container */}
       <div className="relative w-full aspect-video overflow-hidden rounded-2xl">
         <img

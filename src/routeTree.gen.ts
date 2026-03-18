@@ -11,9 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as HistoryRouteImport } from './routes/history'
 import { Route as ChannelsRouteImport } from './routes/channels'
-import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VideosVideoIdRouteImport } from './routes/videos/$videoId'
+import { Route as ApiAuthRouteImport } from './routes/api.auth'
+import { Route as AccountPathnameRouteImport } from './routes/account.$pathname'
 
 const HistoryRoute = HistoryRouteImport.update({
   id: '/history',
@@ -23,11 +24,6 @@ const HistoryRoute = HistoryRouteImport.update({
 const ChannelsRoute = ChannelsRouteImport.update({
   id: '/channels',
   path: '/channels',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AboutRoute = AboutRouteImport.update({
-  id: '/about',
-  path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -40,48 +36,75 @@ const VideosVideoIdRoute = VideosVideoIdRouteImport.update({
   path: '/videos/$videoId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuthRoute = ApiAuthRouteImport.update({
+  id: '/api/auth',
+  path: '/api/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountPathnameRoute = AccountPathnameRouteImport.update({
+  id: '/account/$pathname',
+  path: '/account/$pathname',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/about': typeof AboutRoute
   '/channels': typeof ChannelsRoute
   '/history': typeof HistoryRoute
+  '/account/$pathname': typeof AccountPathnameRoute
+  '/api/auth': typeof ApiAuthRoute
   '/videos/$videoId': typeof VideosVideoIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/about': typeof AboutRoute
   '/channels': typeof ChannelsRoute
   '/history': typeof HistoryRoute
+  '/account/$pathname': typeof AccountPathnameRoute
+  '/api/auth': typeof ApiAuthRoute
   '/videos/$videoId': typeof VideosVideoIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/about': typeof AboutRoute
   '/channels': typeof ChannelsRoute
   '/history': typeof HistoryRoute
+  '/account/$pathname': typeof AccountPathnameRoute
+  '/api/auth': typeof ApiAuthRoute
   '/videos/$videoId': typeof VideosVideoIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/about' | '/channels' | '/history' | '/videos/$videoId'
+  fullPaths:
+    | '/'
+    | '/channels'
+    | '/history'
+    | '/account/$pathname'
+    | '/api/auth'
+    | '/videos/$videoId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/about' | '/channels' | '/history' | '/videos/$videoId'
+  to:
+    | '/'
+    | '/channels'
+    | '/history'
+    | '/account/$pathname'
+    | '/api/auth'
+    | '/videos/$videoId'
   id:
     | '__root__'
     | '/'
-    | '/about'
     | '/channels'
     | '/history'
+    | '/account/$pathname'
+    | '/api/auth'
     | '/videos/$videoId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AboutRoute: typeof AboutRoute
   ChannelsRoute: typeof ChannelsRoute
   HistoryRoute: typeof HistoryRoute
+  AccountPathnameRoute: typeof AccountPathnameRoute
+  ApiAuthRoute: typeof ApiAuthRoute
   VideosVideoIdRoute: typeof VideosVideoIdRoute
 }
 
@@ -101,13 +124,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChannelsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/about': {
-      id: '/about'
-      path: '/about'
-      fullPath: '/about'
-      preLoaderRoute: typeof AboutRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -122,14 +138,29 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VideosVideoIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth': {
+      id: '/api/auth'
+      path: '/api/auth'
+      fullPath: '/api/auth'
+      preLoaderRoute: typeof ApiAuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account/$pathname': {
+      id: '/account/$pathname'
+      path: '/account/$pathname'
+      fullPath: '/account/$pathname'
+      preLoaderRoute: typeof AccountPathnameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AboutRoute: AboutRoute,
   ChannelsRoute: ChannelsRoute,
   HistoryRoute: HistoryRoute,
+  AccountPathnameRoute: AccountPathnameRoute,
+  ApiAuthRoute: ApiAuthRoute,
   VideosVideoIdRoute: VideosVideoIdRoute,
 }
 export const routeTree = rootRouteImport
