@@ -2,7 +2,7 @@ import { authClient } from "#/auth";
 import LoginBtn from "./login-btn";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { IconLogout } from "@tabler/icons-react";
+import { IconLoader, IconLoader2, IconLogout } from "@tabler/icons-react";
 
 function UserDropdown() {
   const { data, isPending } = authClient.useSession();
@@ -23,7 +23,9 @@ function UserDropdown() {
 
   if (isPending) {
     return (
-      <div className="w-8 h-8 rounded-full bg-secondary/50 animate-pulse" />
+      <div className="w-8 h-8 flex items-center justify-center rounded-full bg-secondary/50">
+        <IconLoader size={16} className="animate-spin" />
+      </div>
     );
   }
 
