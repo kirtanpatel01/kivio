@@ -13,7 +13,7 @@ interface ChannelStore {
   // Channel list
   channels: Channel[];
   setChannels: (channels: Channel[]) => void;
-  addChannel: (handle: string) => void;
+  addChannel: (handle: string) => Promise<void>;
   deleteChannel: (id: string) => void;
 
   // Editing
@@ -43,15 +43,46 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
   // Channel list
   channels: [],
   setChannels: (channels) => set({ channels }),
-  addChannel: (handle) => {
-    if (!handle.trim()) return;
+  addChannel: async (handle) => {
+    const trimmed = handle.trim();
+    if (!trimmed) return;
+
+    const normalized = normalizeHandle(trimmed);
     const { channels } = get();
-    const updated = [
-      ...channels,
-      { id: Date.now().toString(), name: normalizeHandle(handle) },
-    ];
-    set({ channels: updated, newChannelName: "" });
-    localStorage.setItem("kivio-channels", JSON.stringify(updated));
+
+    // Avoid duplicates
+    if (channels.some((c) => c.name.toLowerCase() === normalized.toLowerCase())) {
+      set({ error: "Channel already in list", newChannelName: "" });
+      return;
+    }
+
+    set({ loading: true, error: null });
+
+    try {
+      // Verify channel exists before adding to list
+      const details = await fetchChannelByHandle({ data: normalized });
+
+      const updated = [
+        ...get().channels,
+        { id: Date.now().toString(), name: normalized },
+      ];
+
+      set({
+        channels: updated,
+        newChannelName: "",
+        loading: false,
+        // Optional: auto-select the newly added channel
+        selectedChannel: updated[updated.length - 1],
+        channelDetails: details,
+      });
+
+      localStorage.setItem("kivio-channels", JSON.stringify(updated));
+    } catch (err: any) {
+      set({
+        error: err.message || "Could not find that channel",
+        loading: false,
+      });
+    }
   },
   deleteChannel: (id) => {
     const { channels, selectedChannel } = get();
@@ -113,3 +144,4 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
     }
   },
 }));
+

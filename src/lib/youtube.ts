@@ -1,6 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
+import { eq } from "drizzle-orm";
+import { db } from "#/db";
+import { youtubeChannels } from "#/db/schema";
 
 function getEnvVar(key: string): string | undefined {
   // First check process.env (works in production / if set externally)
@@ -41,15 +44,51 @@ export interface YouTubeChannelDetails {
   };
 }
 
+// Cache TTL: 24 hours — channel data doesn't change that frequently
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
 export const fetchChannelByHandle = createServerFn({ method: "GET" })
   .inputValidator((handle: string) => handle)
   .handler(async ({ data: handle }) => {
+    const cleanHandle = (
+      handle.startsWith("@") ? handle : `@${handle}`
+    ).toLowerCase();
+
+    // 1. Check database cache first
+    const cached = await db.query.youtubeChannels.findFirst({
+      where: eq(youtubeChannels.handle, cleanHandle),
+    });
+
+    if (cached && Date.now() - cached.fetchedAt.getTime() < CACHE_TTL_MS) {
+      console.log(`[db cache hit] Returning cached data for ${cleanHandle}`);
+      const result: YouTubeChannelDetails = {
+        id: cached.channelId,
+        title: cached.title,
+        description: cached.description,
+        customUrl: cached.customUrl,
+        publishedAt: cached.publishedAt,
+        country: cached.country ?? undefined,
+        thumbnails: {
+          default: { url: cached.thumbnailDefault },
+          medium: { url: cached.thumbnailMedium },
+          high: { url: cached.thumbnailHigh },
+        },
+        statistics: {
+          viewCount: cached.viewCount,
+          subscriberCount: cached.subscriberCount,
+          videoCount: cached.videoCount,
+        },
+      };
+      return result;
+    }
+
+    // 2. Cache miss or expired — fetch from YouTube API
     const apiKey = getEnvVar("YOUTUBE_API_KEY");
     if (!apiKey) {
       throw new Error("YOUTUBE_API_KEY is not configured in your .env file.");
     }
 
-    const cleanHandle = handle.startsWith("@") ? handle : `@${handle}`;
+    console.log(`[db cache miss] Fetching from YouTube API for ${cleanHandle}`);
 
     const res = await fetch(
       `https://www.googleapis.com/youtube/v3/channels?forHandle=${encodeURIComponent(cleanHandle)}&part=snippet,statistics,contentDetails&key=${apiKey}`,
@@ -83,5 +122,32 @@ export const fetchChannelByHandle = createServerFn({ method: "GET" })
       },
     };
 
+    // 3. Upsert into database cache (insert or update if handle already exists)
+    const row = {
+      handle: cleanHandle,
+      channelId: result.id,
+      title: result.title,
+      description: result.description,
+      customUrl: result.customUrl,
+      publishedAt: result.publishedAt,
+      country: result.country ?? null,
+      thumbnailDefault: result.thumbnails.default.url,
+      thumbnailMedium: result.thumbnails.medium.url,
+      thumbnailHigh: result.thumbnails.high.url,
+      viewCount: result.statistics.viewCount,
+      subscriberCount: result.statistics.subscriberCount,
+      videoCount: result.statistics.videoCount,
+      fetchedAt: new Date(),
+    };
+
+    await db
+      .insert(youtubeChannels)
+      .values(row)
+      .onConflictDoUpdate({
+        target: youtubeChannels.handle,
+        set: { ...row, handle: undefined },
+      });
+
     return result;
   });
+
