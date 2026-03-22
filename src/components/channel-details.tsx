@@ -54,7 +54,14 @@ export default function ChannelDetails() {
     );
   }
 
-  if (!channelDetails) return null;
+  if (!channelDetails) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
+        <IconVideo size={48} strokeWidth={1.2} className="opacity-30" />
+        <p className="text-sm">Channel not found or data is unavailable</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">

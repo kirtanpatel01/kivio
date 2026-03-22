@@ -1,8 +1,14 @@
 import { create } from "zustand";
 import {
   fetchChannelByHandle,
-  type YouTubeChannelDetails,
-} from "#/lib/youtube";
+} from "#/actions/youtube";
+import { type YouTubeChannelDetails } from "#/lib/youtube";
+import {
+  addUserChannel,
+  getUserChannels,
+  removeUserChannel,
+  updateUserChannel,
+} from "#/actions/channels";
 
 export interface Channel {
   id: string;
@@ -12,16 +18,17 @@ export interface Channel {
 interface ChannelStore {
   // Channel list
   channels: Channel[];
-  setChannels: (channels: Channel[]) => void;
+  setChannels: (channels: { id: string; handle: string }[]) => void;
+  loadChannels: () => Promise<void>;
   addChannel: (handle: string) => Promise<void>;
-  deleteChannel: (id: string) => void;
+  deleteChannel: (id: string) => Promise<void>;
 
   // Editing
   editingId: string | null;
   editingName: string;
   startEdit: (channel: Channel) => void;
   setEditingName: (name: string) => void;
-  saveEdit: () => void;
+  saveEdit: () => Promise<void>;
   cancelEdit: () => void;
 
   // Input
@@ -42,7 +49,22 @@ const normalizeHandle = (value: string) =>
 export const useChannelStore = create<ChannelStore>((set, get) => ({
   // Channel list
   channels: [],
-  setChannels: (channels) => set({ channels }),
+  setChannels: (data) =>
+    set({
+      channels: data.map((d) => ({ id: d.id, name: d.handle })),
+    }),
+  loadChannels: async () => {
+    set({ loading: true, error: null });
+    try {
+      const dbChannels = await getUserChannels();
+      set({
+        channels: dbChannels.map((c) => ({ id: c.id, name: c.handle })),
+        loading: false,
+      });
+    } catch (err: any) {
+      set({ error: err.message || "Failed to load channels", loading: false });
+    }
+  },
   addChannel: async (handle) => {
     const trimmed = handle.trim();
     if (!trimmed) return;
@@ -50,7 +72,7 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
     const normalized = normalizeHandle(trimmed);
     const { channels } = get();
 
-    // Avoid duplicates
+    // Avoid duplicates in the UI
     if (channels.some((c) => c.name.toLowerCase() === normalized.toLowerCase())) {
       set({ error: "Channel already in list", newChannelName: "" });
       return;
@@ -59,44 +81,56 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
     set({ loading: true, error: null });
 
     try {
-      // Verify channel exists before adding to list
+      // 1. Verify channel exists on YouTube first
       const details = await fetchChannelByHandle({ data: normalized });
+      if (!details) {
+        throw new Error(`No channel found for handle "${normalized}"`);
+      }
 
-      const updated = [
-        ...get().channels,
-        { id: Date.now().toString(), name: normalized },
-      ];
+      // 2. Save it to user's database list
+      const newDBChannel = await addUserChannel({ data: normalized });
+
+      const newChannel: Channel = {
+        id: newDBChannel.id,
+        name: newDBChannel.handle,
+      };
 
       set({
-        channels: updated,
+        channels: [newChannel, ...get().channels],
         newChannelName: "",
         loading: false,
-        // Optional: auto-select the newly added channel
-        selectedChannel: updated[updated.length - 1],
+        selectedChannel: newChannel,
         channelDetails: details,
       });
-
-      localStorage.setItem("kivio-channels", JSON.stringify(updated));
     } catch (err: any) {
       set({
-        error: err.message || "Could not find that channel",
+        error: err.message || "Could not add that channel",
         loading: false,
       });
     }
   },
-  deleteChannel: (id) => {
-    const { channels, selectedChannel } = get();
-    const updated = channels.filter((c) => c.id !== id);
-    const resetSelection = selectedChannel?.id === id;
-    set({
-      channels: updated,
-      ...(resetSelection && {
-        selectedChannel: null,
-        channelDetails: null,
-        error: null,
-      }),
-    });
-    localStorage.setItem("kivio-channels", JSON.stringify(updated));
+  deleteChannel: async (id) => {
+    const { selectedChannel } = get();
+    set({ loading: true, error: null });
+
+    try {
+      await removeUserChannel({ data: id });
+
+      const updated = get().channels.filter((c) => c.id !== id);
+      const resetSelection = selectedChannel?.id === id;
+
+      set({
+        channels: updated,
+        loading: false,
+        ...(resetSelection && {
+          selectedChannel: null,
+          channelDetails: null,
+          error: null,
+        }),
+      });
+    } catch (err: any) {
+      set({ error: err.message || "Failed to delete channel", loading: false });
+    }
   },
 
   // Editing
@@ -105,14 +139,28 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
   startEdit: (channel) =>
     set({ editingId: channel.id, editingName: channel.name }),
   setEditingName: (name) => set({ editingName: name }),
-  saveEdit: () => {
+  saveEdit: async () => {
     const { editingName, editingId, channels } = get();
-    if (!editingName.trim()) return;
-    const updated = channels.map((c) =>
-      c.id === editingId ? { ...c, name: normalizeHandle(editingName) } : c,
-    );
-    set({ channels: updated, editingId: null });
-    localStorage.setItem("kivio-channels", JSON.stringify(updated));
+    if (!editingName.trim() || !editingId) return;
+
+    const normalized = normalizeHandle(editingName);
+    set({ loading: true, error: null });
+
+    try {
+      // 1. Verify handle on YouTube
+      await fetchChannelByHandle({ data: normalized });
+
+      // 2. Update in user's DB list
+      await updateUserChannel({ data: { id: editingId, handle: normalized } });
+
+      const updated = channels.map((c) =>
+        c.id === editingId ? { ...c, name: normalized } : c,
+      );
+
+      set({ channels: updated, editingId: null, loading: false });
+    } catch (err: any) {
+      set({ error: err.message || "Failed to edit channel", loading: false });
+    }
   },
   cancelEdit: () => set({ editingId: null }),
 
@@ -135,7 +183,11 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
 
     try {
       const details = await fetchChannelByHandle({ data: channel.name });
-      set({ channelDetails: details, loading: false });
+      if (details === null) {
+        set({ channelDetails: null, loading: false });
+      } else {
+        set({ channelDetails: details, loading: false });
+      }
     } catch (err: any) {
       set({
         error: err.message || "Failed to fetch channel details",
@@ -144,4 +196,5 @@ export const useChannelStore = create<ChannelStore>((set, get) => ({
     }
   },
 }));
+
 

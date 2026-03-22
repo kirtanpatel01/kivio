@@ -17,7 +17,6 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
-    "@neondatabase/neon-js": "^0.2.0-beta.1",
     "@neondatabase/serverless": "^1.0.2",
     "@tabler/icons-react": "^3.40.0",
     "@tailwindcss/vite": "^4.1.18",
@@ -28,11 +27,13 @@
     "@tanstack/react-start": "latest",
     "@tanstack/router-plugin": "^1.132.0",
     "better-auth": "^1.5.5",
+    "dotenv": "^17.3.1",
     "drizzle-orm": "^0.45.1",
     "lucide-react": "^0.545.0",
     "motion": "^12.38.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.1.18",
     "zustand": "^5.0.12"
   },

@@ -1,4 +1,4 @@
-import { authClient } from "#/auth";
+import { authClient } from "#/lib/auth-client";
 import { IconLoader } from "@tabler/icons-react";
 import { useState } from "react";
 
