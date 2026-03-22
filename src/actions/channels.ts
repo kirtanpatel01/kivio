@@ -33,10 +33,7 @@ export const addUserChannel = createServerFn({ method: "POST" })
     try {
       const session = await ensureSession();
       const userId = session.user.id;
-      if (!userId) {
-        console.warn("[Channels Action] Not logged in, returning empty list");
-        return [];
-      }
+      if (!userId) throw new Error("Unauthorized");
 
       const [newChannel] = await db
         .insert(channels)
@@ -59,10 +56,7 @@ export const removeUserChannel = createServerFn({ method: "POST" })
     try {
       const session = await ensureSession();
       const userId = session.user.id;
-      if (!userId) {
-        console.warn("[Channels Action] Not logged in, returning empty list");
-        return [];
-      }
+      if (!userId) throw new Error("Unauthorized");
 
       await db
         .delete(channels)
@@ -81,10 +75,7 @@ export const updateUserChannel = createServerFn({ method: "POST" })
     try {
       const session = await ensureSession();
       const userId = session.user.id;
-      if (!userId) {
-        console.warn("[Channels Action] Not logged in, returning empty list");
-        return [];
-      }
+      if (!userId) throw new Error("Unauthorized");
 
       const [updated] = await db
         .update(channels)

@@ -1,11 +1,10 @@
 import {
   IconBrandYoutube,
   IconEye,
-  IconLoader2,
   IconUsers,
   IconVideo,
 } from "@tabler/icons-react";
-import { useChannelStore } from "#/stores/channel-store";
+import { getRouteApi } from "@tanstack/react-router";
 
 function formatCount(count: string): string {
   const num = Number.parseInt(count, 10);
@@ -23,10 +22,13 @@ function formatDate(dateStr: string): string {
   });
 }
 
-export default function ChannelDetails() {
-  const { selectedChannel, channelDetails, loading, error } = useChannelStore();
+const routeApi = getRouteApi("/channels");
 
-  if (!selectedChannel) {
+export default function ChannelDetails() {
+  const { handle } = routeApi.useSearch();
+  const { details } = routeApi.useLoaderData();
+
+  if (!handle) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
         <IconBrandYoutube size={48} strokeWidth={1.2} className="opacity-30" />
@@ -35,26 +37,7 @@ export default function ChannelDetails() {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
-        <IconLoader2 size={32} className="animate-spin opacity-50" />
-        <p className="text-sm">Fetching channel details...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3 px-8">
-        <div className="px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center max-w-md">
-          {error}
-        </div>
-      </div>
-    );
-  }
-
-  if (!channelDetails) {
+  if (!details) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
         <IconVideo size={48} strokeWidth={1.2} className="opacity-30" />
@@ -68,20 +51,20 @@ export default function ChannelDetails() {
       {/* Channel Header */}
       <div className="flex items-start gap-5">
         <img
-          src={channelDetails.thumbnails.high.url}
-          alt={channelDetails.title}
+          src={details.thumbnails.high.url}
+          alt={details.title}
           className="w-24 h-24 rounded-full border-2 border-primary/20 shadow-lg shadow-primary/5"
         />
         <div className="flex-1 min-w-0 space-y-1.5">
           <h2 className="text-2xl font-bold tracking-tight truncate">
-            {channelDetails.title}
+            {details.title}
           </h2>
           <p className="text-sm text-muted-foreground font-medium">
-            {channelDetails.customUrl}
+            {details.customUrl}
           </p>
-          {channelDetails.country && (
+          {details.country && (
             <span className="inline-block text-xs bg-secondary/60 px-2 py-0.5 rounded-full text-muted-foreground">
-              {channelDetails.country}
+              {details.country}
             </span>
           )}
         </div>
@@ -91,17 +74,17 @@ export default function ChannelDetails() {
       <div className="grid grid-cols-3 gap-3">
         <StatCard
           icon={<IconUsers size={20} className="text-primary/70" />}
-          value={formatCount(channelDetails.statistics.subscriberCount)}
+          value={formatCount(details.statistics.subscriberCount)}
           label="Subscribers"
         />
         <StatCard
           icon={<IconEye size={20} className="text-primary/70" />}
-          value={formatCount(channelDetails.statistics.viewCount)}
+          value={formatCount(details.statistics.viewCount)}
           label="Total Views"
         />
         <StatCard
           icon={<IconVideo size={20} className="text-primary/70" />}
-          value={formatCount(channelDetails.statistics.videoCount)}
+          value={formatCount(details.statistics.videoCount)}
           label="Videos"
         />
       </div>
@@ -112,16 +95,16 @@ export default function ChannelDetails() {
           <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1">
             Joined
           </h3>
-          <p className="text-sm">{formatDate(channelDetails.publishedAt)}</p>
+          <p className="text-sm">{formatDate(details.publishedAt)}</p>
         </div>
 
-        {channelDetails.description && (
+        {details.description && (
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
               About
             </h3>
             <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-line">
-              {channelDetails.description}
+              {details.description}
             </p>
           </div>
         )}

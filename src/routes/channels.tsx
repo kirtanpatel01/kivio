@@ -1,24 +1,36 @@
 import { createFileRoute } from "@tanstack/react-router";
-import ChannelList from "#/components/channel-list";
-import ChannelDetails from "#/components/channel-details";
+import ChannelList from "#/components/channels/channel-list";
+import ChannelDetails from "#/components/channels/channel-details";
 import { IconLoader } from "@tabler/icons-react";
-import { useChannelStore } from "#/stores/channel-store";
-import { useEffect } from "react";
 import { authClient } from "#/lib/auth-client";
+import { getUserChannels } from "#/actions/channels";
+import { fetchChannelByHandle } from "#/actions/youtube";
 
-export const Route = createFileRoute("/channels")({
+interface ChannelSearch {
+  handle?: string;
+}
+
+export const Route = createFileRoute("/channels")({ 
+  validateSearch: (search: Record<string, unknown>): ChannelSearch => {
+    return {
+      handle: (search.handle as string) || undefined,
+    };
+  },
+  loaderDeps: ({ search: { handle } }) => ({handle}),
+  loader: async ({ deps: { handle } }) => {
+    const channels = await getUserChannels();
+    let details = null;
+    if(handle) {
+      details = await fetchChannelByHandle({ data: handle });
+    }
+    return { channels, details };
+  },
   component: RouteComponent,
 });
 
 function RouteComponent() {
   const { data: session, isPending } = authClient.useSession();
-  const loadChannels = useChannelStore(s => s.loadChannels);
-
-  useEffect(() => {
-    if (!isPending && session) {
-      loadChannels();
-    }
-  }, [loadChannels, isPending, session]);
+  const { channels } = Route.useLoaderData();
 
   if (isPending) {
     return (
@@ -42,7 +54,7 @@ function RouteComponent() {
 
   return (
     <div className="h-[calc(100vh-3rem)] flex overflow-hidden">
-      <ChannelList />
+      <ChannelList channels={channels} />
       <div className="flex-1 h-full overflow-y-auto custom-scrollbar">
         <ChannelDetails />
       </div>
