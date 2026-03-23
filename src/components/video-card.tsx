@@ -1,3 +1,6 @@
+import { recordHistory } from "#/actions/history";
+import { IconHistory } from "@tabler/icons-react";
+
 function getTimeAgo(date: Date) {
   const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
   let interval = seconds / 31536000;
@@ -13,11 +16,27 @@ function getTimeAgo(date: Date) {
   return Math.floor(seconds) + " seconds ago";
 }
 
-function VideoCard({ video }: { video: any }) {
+function VideoCard({ video, isWatched }: { video: any; isWatched?: boolean }) {
   const publishedAt = new Date(video.publishedAt);
 
+  const handleRecordHistory = () => {
+    recordHistory({
+      data: {
+        videoId: video.id,
+        title: video.title,
+        channelTitle: video.channelTitle,
+        thumbnail: video.thumbnail,
+        duration: video.duration,
+        viewCount: video.viewCount,
+      },
+    }).catch((err) => console.error("History recording failed", err));
+  };
+
   return (
-    <div className="w-full group cursor-pointer flex flex-col gap-3 relative">
+    <div 
+      className="w-full group cursor-pointer flex flex-col gap-3 relative"
+      onClick={handleRecordHistory}
+    >
       <div className="w-full h-full inset-0 absolute group-hover:bg-primary/5 z-0 group-hover:scale-[1.02] rounded-xl transition-all duration-300" />
       
       {/* Thumbnail Container */}
@@ -27,6 +46,11 @@ function VideoCard({ video }: { video: any }) {
           alt={video.title}
           className="w-full h-full object-cover group-hover:scale-[1.01] transition-transform duration-300 z-20"
         />
+        {isWatched && (
+          <div className="absolute top-2 right-2 p-1.5 bg-black/60 backdrop-blur-md rounded-full text-white z-30 shadow-lg border border-white/10">
+            <IconHistory size={14} className="text-primary" />
+          </div>
+        )}
         {video.duration && (
           <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/80 text-[10px] sm:text-xs font-bold text-white rounded-md backdrop-blur-sm z-30">
             {video.duration}

@@ -1,114 +1,65 @@
-import { IconSearch, IconTrash, IconX } from "@tabler/icons-react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { IconHistory, IconSearch, IconTrash, IconX } from "@tabler/icons-react";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
+import { getHistory, deleteHistoryItem, clearHistory } from "#/actions/history";
 
 export const Route = createFileRoute("/history")({
+  loader: async () => {
+    const history = await getHistory();
+    return { initialHistory: history || [] };
+  },
   component: RouteComponent,
 });
 
-const MOCK_HISTORY = [
-  {
-    id: "v1",
-    title: "How to use tailwind and motion to create super cool UI",
-    channel: "Manu Paji",
-    views: "100k",
-    time: "2 hours ago",
-    thumbnail: "https://picsum.photos/seed/v1/300/200",
-    duration: "14:32",
-  },
-  {
-    id: "v2",
-    title: "Mastering React Query for Enterprise Applications",
-    channel: "TanStack Guru",
-    views: "85k",
-    time: "5 hours ago",
-    thumbnail: "https://picsum.photos/seed/v2/300/200",
-    duration: "22:10",
-  },
-  {
-    id: "v3",
-    title: "Vite 7 vs Webpack 5: The Ultimate Comparison",
-    channel: "Frontend Weekly",
-    views: "1.2M",
-    time: "1 day ago",
-    thumbnail: "https://picsum.photos/seed/v3/300/200",
-    duration: "10:05",
-  },
-  {
-    id: "v4",
-    title: "Building an Agentic AI Assistant from scratch",
-    channel: "Tech Insights",
-    views: "450k",
-    time: "2 days ago",
-    thumbnail: "https://picsum.photos/seed/v4/300/200",
-    duration: "45:12",
-  },
-  {
-    id: "v5",
-    title: "Building an Agentic AI Assistant from scratch",
-    channel: "Tech Insights",
-    views: "450k",
-    time: "2 days ago",
-    thumbnail: "https://picsum.photos/seed/v4/300/200",
-    duration: "45:12",
-  },
-  {
-    id: "v6",
-    title: "Building an Agentic AI Assistant from scratch",
-    channel: "Tech Insights",
-    views: "450k",
-    time: "2 days ago",
-    thumbnail: "https://picsum.photos/seed/v4/300/200",
-    duration: "45:12",
-  },
-  {
-    id: "v7",
-    title: "Building an Agentic AI Assistant from scratch",
-    channel: "Tech Insights",
-    views: "450k",
-    time: "2 days ago",
-    thumbnail: "https://picsum.photos/seed/v4/300/200",
-    duration: "45:12",
-  },
-  {
-    id: "v8",
-    title: "Building an Agentic AI Assistant from scratch",
-    channel: "Tech Insights",
-    views: "450k",
-    time: "2 days ago",
-    thumbnail: "https://picsum.photos/seed/v4/300/200",
-    duration: "45:12",
-  },
-  {
-    id: "v9",
-    title: "Building an Agentic AI Assistant from scratch",
-    channel: "Tech Insights",
-    views: "450k",
-    time: "2 days ago",
-    thumbnail: "https://picsum.photos/seed/v4/300/200",
-    duration: "45:12",
-  },
-];
+function getTimeAgo(dateStr: string | Date) {
+  const date = new Date(dateStr);
+  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+  let interval = seconds / 31536000;
+  if (interval > 1) return Math.floor(interval) + " years ago";
+  interval = seconds / 2592000;
+  if (interval > 1) return Math.floor(interval) + " months ago";
+  interval = seconds / 86400;
+  if (interval > 1) return Math.floor(interval) + " days ago";
+  interval = seconds / 3600;
+  if (interval > 1) return Math.floor(interval) + " hours ago";
+  interval = seconds / 60;
+  if (interval > 1) return Math.floor(interval) + " minutes ago";
+  return Math.floor(seconds) + " seconds ago";
+}
 
 function RouteComponent() {
-  const [history, setHistory] = useState(MOCK_HISTORY);
+  const { initialHistory } = Route.useLoaderData();
+  const [history, setHistory] = useState(initialHistory);
   const [search, setSearch] = useState("");
+  const router = useRouter();
 
   const filteredHistory = history.filter(
     (item) =>
       item.title.toLowerCase().includes(search.toLowerCase()) ||
-      item.channel.toLowerCase().includes(search.toLowerCase()),
+      item.channelTitle.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const removeItem = (id: string, e: React.MouseEvent) => {
+  const removeItem = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setHistory(history.filter((h) => h.id !== id));
+    try {
+      await deleteHistoryItem({ data: id });
+      setHistory(history.filter((h) => h.id !== id));
+      router.invalidate();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const clearAll = () => {
+  const clearAll = async () => {
     if (confirm("Are you sure you want to clear your entire watch history?")) {
-      setHistory([]);
+      try {
+        await clearHistory();
+        setHistory([]);
+        router.invalidate();
+      } catch (err) {
+        console.error(err);
+      }
     }
   };
 
@@ -162,7 +113,7 @@ function RouteComponent() {
               <Link
                 key={video.id}
                 to="/videos/$videoId"
-                params={{ videoId: video.id }}
+                params={{ videoId: video.videoId }}
                 className="group relative flex flex-col sm:flex-row gap-4 sm:p-3 rounded-2xl hover:bg-secondary/20 transition-all duration-300 border border-transparent hover:border-border/50"
               >
                 {/* Thumbnail */}
@@ -172,6 +123,9 @@ function RouteComponent() {
                     alt={video.title}
                     className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
                   />
+                  <div className="absolute top-2 right-2 p-1.5 bg-black/60 backdrop-blur-md rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                    <IconHistory size={12} />
+                  </div>
                   <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/80 text-[10px] font-bold text-white rounded-md backdrop-blur-sm">
                     {video.duration}
                   </div>
@@ -184,19 +138,23 @@ function RouteComponent() {
                   </h3>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                     <p className="text-sm text-foreground-secondary font-medium hover:text-primary transition-colors">
-                      {video.channel}
+                      {video.channelTitle}
                     </p>
-                    <span className="hidden sm:inline text-foreground-secondary/30">
-                      •
-                    </span>
-                    <p className="text-sm text-foreground-secondary/70">
-                      {video.views} views
-                    </p>
+                    {video.viewCount && (
+                      <>
+                        <span className="hidden sm:inline text-foreground-secondary/30">
+                          •
+                        </span>
+                        <p className="text-sm text-foreground-secondary/70">
+                          {video.viewCount} views
+                        </p>
+                      </>
+                    )}
                     <span className="hidden sm:inline text-foreground-secondary/30">
                       •
                     </span>
                     <p className="text-sm text-foreground-secondary/70 italic">
-                      Watched {video.time}
+                      Watched {getTimeAgo(video.watchedAt)}
                     </p>
                   </div>
                 </div>

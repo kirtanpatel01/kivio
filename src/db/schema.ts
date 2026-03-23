@@ -114,10 +114,27 @@ export const youtubeChannels = pgTable("youtube_channels", {
     .defaultNow(),
 });
 
+export const history = pgTable("history", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  videoId: text("video_id").notNull(),
+  title: text("title").notNull(),
+  channelTitle: text("channel_title").notNull(),
+  thumbnail: text("thumbnail").notNull(),
+  duration: text("duration"),
+  viewCount: text("view_count"),
+  watchedAt: timestamp("watched_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
   channels: many(channels),
+  history: many(history),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -142,5 +159,12 @@ export const channelRelations = relations(channels, ({ one }) => ({
   youtubeChannel: one(youtubeChannels, {
     fields: [channels.handle],
     references: [youtubeChannels.handle],
+  }),
+}));
+
+export const historyRelations = relations(history, ({ one }) => ({
+  user: one(user, {
+    fields: [history.userId],
+    references: [user.id],
   }),
 }));

@@ -1,12 +1,17 @@
-import { IconChevronDown, IconChevronLeft } from "@tabler/icons-react";
 import { fetchVideoDetails, fetchVideosByPlaylistId } from "#/actions/youtube";
+import { recordHistory, getWatchedVideoIds } from "#/actions/history";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
+import { IconChevronDown, IconChevronLeft, IconHistory } from "@tabler/icons-react";
 
 export const Route = createFileRoute("/videos/$videoId")({
   loader: async ({ params: { videoId } }) => {
-    const video = await fetchVideoDetails({ data: videoId });
-    if (!video) return { video: null, suggestions: [] };
+    const [video, watchedIds] = await Promise.all([
+      fetchVideoDetails({ data: videoId }),
+      getWatchedVideoIds()
+    ]);
+    
+    if (!video) return { video: null, suggestions: [], watchedIds: watchedIds || [] };
 
     // Fetch some suggestions from the same channel
     const suggestionData = video.uploadsPlaylistId 
@@ -15,7 +20,8 @@ export const Route = createFileRoute("/videos/$videoId")({
 
     return { 
       video, 
-      suggestions: suggestionData?.videos || [] 
+      suggestions: suggestionData?.videos || [],
+      watchedIds: watchedIds || []
     };
   },
   component: RouteComponent,
@@ -67,7 +73,7 @@ function LinkifiedText({ text }: { text: string }) {
 }
 
 function RouteComponent() {
-  const { video, suggestions } = Route.useLoaderData();
+  const { video, suggestions, watchedIds } = Route.useLoaderData();
   const [showDescription, setShowDescription] = useState(false);
 
   const filteredSuggestions = useMemo(() => {
@@ -185,6 +191,18 @@ function RouteComponent() {
               key={v.id} 
               to={`/videos/$videoId`} 
               params={{ videoId: v.id }}
+              onClick={() => {
+                recordHistory({
+                  data: {
+                    videoId: v.id,
+                    title: v.title,
+                    channelTitle: v.channelTitle,
+                    thumbnail: v.thumbnail,
+                    duration: v.duration,
+                    viewCount: v.viewCount,
+                  },
+                }).catch((e) => console.error(e));
+              }}
             >
               <div className="group flex gap-3 cursor-pointer p-2 rounded-xl hover:bg-secondary/40 transition-all duration-300 border border-transparent hover:border-border/10">
                 {/* Compact Thumbnail */}
@@ -194,6 +212,11 @@ function RouteComponent() {
                     alt={v.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
+                  {watchedIds.includes(v.id) && (
+                    <div className="absolute top-1.5 right-1.5 p-1 bg-black/60 backdrop-blur-md rounded-full text-white z-30 shadow-md">
+                      <IconHistory size={11} className="text-primary" />
+                    </div>
+                  )}
                 </div>
 
                 {/* Suggestions Info */}

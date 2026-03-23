@@ -1,19 +1,27 @@
 import VideoCard from '#/components/video-card'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { fetchFeedForUser } from '#/actions/youtube'
+import { getWatchedVideoIds } from '#/actions/history'
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { IconLoader } from '@tabler/icons-react'
 
 export const Route = createFileRoute('/')({
   loader: async () => {
-    const result = await fetchFeedForUser()
-    return result || { videos: [], nextPageTokens: {} }
+    const [feed, watchedIds] = await Promise.all([
+      fetchFeedForUser(),
+      getWatchedVideoIds()
+    ])
+    return { 
+      videos: feed?.videos || [], 
+      nextPageTokens: feed?.nextPageTokens || {},
+      watchedIds: watchedIds || []
+    }
   },
   component: Dashboard,
 })
 
 function Dashboard() {
-  const { videos: initialVideos, nextPageTokens: initialTokens } = Route.useLoaderData()
+  const { videos: initialVideos, nextPageTokens: initialTokens, watchedIds } = Route.useLoaderData()
   const [videos, setVideos] = useState(initialVideos)
   const [nextPageTokens, setNextPageTokens] = useState(initialTokens)
   const [isFetchingMore, setIsFetchingMore] = useState(false)
@@ -165,7 +173,10 @@ function Dashboard() {
                 key={video.id}
                 className="transition-transform duration-300 hover:scale-[1.01]"
               >
-                <VideoCard video={video} />
+                <VideoCard 
+                  video={video} 
+                  isWatched={watchedIds.includes(video.id)} 
+                />
               </Link>
             ))}
           </div>
