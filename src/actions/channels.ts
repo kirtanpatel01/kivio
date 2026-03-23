@@ -1,8 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { db } from "#/db";
-import { channels } from "#/db/schema";
+import { channels, youtubeChannels } from "#/db/schema";
 import { eq, and } from "drizzle-orm";
 import { ensureSession } from "#/lib/auth.functions";
+import { fetchChannelByHandle } from "./youtube";
 
 export const getUserChannels = createServerFn({ method: "GET" }).handler(
   async () => {
@@ -34,6 +35,31 @@ export const addUserChannel = createServerFn({ method: "POST" })
       const session = await ensureSession();
       const userId = session.user.id;
       if (!userId) throw new Error("Unauthorized");
+
+      const details = await fetchChannelByHandle({ data: handle });
+      if (!details) throw new Error("Channel not found");
+
+      await db.insert(youtubeChannels).values({
+        handle: handle.toLowerCase(),
+        channelId: details.id,
+        title: details.title,
+        description: details.description,
+        customUrl: details.customUrl,
+        publishedAt: details.publishedAt,
+        country: details.country,
+        thumbnailDefault: details.thumbnails.default.url,
+        thumbnailMedium: details.thumbnails.medium.url,
+        thumbnailHigh: details.thumbnails.high.url,
+        viewCount: details.statistics.viewCount,
+        subscriberCount: details.statistics.subscriberCount,
+        videoCount: details.statistics.videoCount,
+        uploadsPlaylistId: details.uploadsPlaylistId,
+        fetchedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: youtubeChannels.handle,
+        set: { fetchedAt: new Date() }
+      });
 
       const [newChannel] = await db
         .insert(channels)

@@ -15,4 +15,5 @@ export interface YouTubeChannelDetails {
     subscriberCount: string;
     videoCount: string;
   };
+  uploadsPlaylistId: string;
 }

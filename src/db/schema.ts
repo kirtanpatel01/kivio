@@ -78,7 +78,9 @@ export const channels = pgTable("channels", {
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
-  handle: text("handle").notNull(),
+  handle: text("handle")
+    .notNull()
+    .references(() => youtubeChannels.handle, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -104,6 +106,7 @@ export const youtubeChannels = pgTable("youtube_channels", {
   viewCount: text("view_count").notNull(),
   subscriberCount: text("subscriber_count").notNull(),
   videoCount: text("video_count").notNull(),
+  uploadsPlaylistId: text("uploads_playlist_id").notNull(),
 
   // Cache metadata
   fetchedAt: timestamp("fetched_at", { withTimezone: true })
@@ -135,5 +138,9 @@ export const channelRelations = relations(channels, ({ one }) => ({
   user: one(user, {
     fields: [channels.userId],
     references: [user.id],
+  }),
+  youtubeChannel: one(youtubeChannels, {
+    fields: [channels.handle],
+    references: [youtubeChannels.handle],
   }),
 }));
