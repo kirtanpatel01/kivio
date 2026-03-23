@@ -30,17 +30,17 @@ function VideoCard({ video }: { video: any }) {
       </div>
 
       {/* Info Section */}
-      <div className="flex gap-3 px-1 z-20">
+      <div className="w-full flex gap-3 px-1 z-20">
         <img
           src={video.channelAvatar}
           alt={video.channelTitle}
           className="size-10 rounded-full shrink-0 object-cover border border-border/10 bg-secondary/20"
         />
-        <div className="flex flex-col gap-1 overflow-hidden">
+        <div className="w-full flex flex-col gap-1 overflow-hidden">
           <h3 className="text-sm sm:text-base font-bold line-clamp-2 leading-tight">
             {video.title}
           </h3>
-          <div className="flex flex-col">
+          <div className="flex items-center justify-between">
             <p className="text-xs sm:text-sm text-foreground/60 font-medium hover:text-primary transition-colors truncate">
               {video.channelTitle}
             </p>

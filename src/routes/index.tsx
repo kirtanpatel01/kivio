@@ -1,19 +1,87 @@
 import VideoCard from '#/components/video-card'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { fetchFeedForUser } from '#/actions/youtube'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { IconLoader } from '@tabler/icons-react'
 
 export const Route = createFileRoute('/')({
   loader: async () => {
-    const videos = await fetchFeedForUser()
-    return { videos: videos || [] }
+    const result = await fetchFeedForUser()
+    return result || { videos: [], nextPageTokens: {} }
   },
   component: Dashboard,
 })
 
 function Dashboard() {
-  const { videos } = Route.useLoaderData()
+  const { videos: initialVideos, nextPageTokens: initialTokens } = Route.useLoaderData()
+  const [videos, setVideos] = useState(initialVideos)
+  const [nextPageTokens, setNextPageTokens] = useState(initialTokens)
+  const [isFetchingMore, setIsFetchingMore] = useState(false)
+  const observerTarget = useRef<HTMLDivElement>(null)
+  const [selectedChannelIds, setSelectedChannelIds] = useState<string[]>([])
 
-  if (!videos || !Array.isArray(videos) || videos.length === 0) {
+  const uniqueChannels = useMemo(() => {
+    const channelMap = new Map()
+    videos.forEach((v: any) => {
+      if (!channelMap.has(v.channelId)) {
+        channelMap.set(v.channelId, {
+          id: v.channelId,
+          title: v.channelTitle,
+          avatar: v.channelAvatar,
+        })
+      }
+    })
+    return Array.from(channelMap.values())
+  }, [videos]);
+
+  const filteredVideos = useMemo(() => {
+    if (selectedChannelIds.length === 0) return videos
+    return videos.filter((v: any) => selectedChannelIds.includes(v.channelId))
+  }, [videos, selectedChannelIds]);
+
+  const toggleChannel = (id: string) => {
+    setSelectedChannelIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+    )
+  }
+
+  const loadMore = useCallback(async () => {
+    if (isFetchingMore || Object.keys(nextPageTokens).length === 0) return
+
+    setIsFetchingMore(true)
+    try {
+      const result = await fetchFeedForUser({ data: nextPageTokens })
+      if (result && result.videos.length > 0) {
+        setVideos((prev) => [...prev, ...result.videos])
+        setNextPageTokens(result.nextPageTokens)
+      } else {
+        setNextPageTokens({})
+      }
+    } catch (err) {
+      console.error("[Dashboard] Error loading more videos:", err)
+    } finally {
+      setIsFetchingMore(false)
+    }
+  }, [nextPageTokens, isFetchingMore])
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMore()
+        }
+      },
+      { threshold: 0.1 },
+    )
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current)
+    }
+
+    return () => observer.disconnect()
+  }, [loadMore])
+
+  if (!videos || videos.length === 0) {
     return (
       <div className="h-[80vh] flex flex-col items-center justify-center text-center gap-4">
         <h2 className="text-2xl font-bold">Your feed is empty</h2>
@@ -31,17 +99,91 @@ function Dashboard() {
   }
 
   return (
-    <main className="p-3 sm:p-4 md:p-6 max-w-7xl mx-auto">
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {videos.map((video: any) => (
-          <Link
-            to={`/videos/$videoId`}
-            params={{ videoId: video.id }}
-            key={video.id}
+    <main className="flex min-h-[calc(100vh-4rem)] max-w-[1600px] mx-auto px-4 md:px-0">
+      {/* Fixed Sidebar Filter */}
+      <aside className="hidden md:flex flex-col w-72 h-[calc(100vh-4rem)] sticky top-0 border-r border-border/50 p-4 space-y-2 shrink-0">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-bold tracking-widest text-muted-foreground">
+            Channels
+          </h2>
+          {selectedChannelIds.length > 0 && (
+            <button
+              onClick={() => setSelectedChannelIds([])}
+              className="text-[10px] font-bold text-primary/80 tracking-wider hover:bg-pri transition-opacity cursor-pointer"
+            >
+              Reset
+            </button>
+          )}
+        </div>
+
+        <nav className="flex flex-col gap-2 overflow-y-auto pr-2 custom-scrollbar">
+          <button
+            onClick={() => setSelectedChannelIds([])}
+            className={`flex items-center p-3 rounded-xl text-sm font-semibold transition-all duration-200 border cursor-pointer ${
+              selectedChannelIds.length === 0
+                ? 'bg-primary/80 hover:bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20'
+                : 'bg-transparent border-transparent text-foreground/80 hover:bg-secondary/60 hover:text-foreground'
+            }`}
           >
-            <VideoCard video={video} />
-          </Link>
-        ))}
+            All Channels
+          </button>
+
+          {uniqueChannels.map((channel: any) => (
+            <button
+              key={channel.id}
+              onClick={() => toggleChannel(channel.id)}
+              className={`flex items-center gap-2 p-2 rounded-xl text-sm font-semibold transition-all duration-200 border cursor-pointer ${
+                selectedChannelIds.includes(channel.id)
+                  ? 'bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20'
+                  : 'bg-transparent border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+              }`}
+            >
+              <img
+                src={channel.avatar}
+                alt={channel.title}
+                className="size-8 rounded-full border border-border/20 shadow-sm shrink-0"
+              />
+              <span className="truncate">{channel.title}</span>
+            </button>
+          ))}
+        </nav>
+      </aside>
+
+      {/* Grid Content */}
+      <div className="flex-1 p-4">
+        {filteredVideos.length === 0 ? (
+          <div className="h-[60vh] flex flex-col items-center justify-center text-center space-y-2">
+            <p className="text-xl font-bold">No videos found</p>
+            <p className="text-sm text-muted-foreground">Try selecting a different filter.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            {filteredVideos.map((video: any) => (
+              <Link
+                to={`/videos/$videoId`}
+                params={{ videoId: video.id }}
+                key={video.id}
+                className="transition-transform duration-300 hover:scale-[1.01]"
+              >
+                <VideoCard video={video} />
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {/* Observer Target & Loading State */}
+        <div 
+          ref={observerTarget} 
+          className="w-full py-12 flex items-center justify-center transition-opacity duration-300"
+          style={{ opacity: Object.keys(nextPageTokens).length > 0 ? 1 : 0 }}
+        >
+          {isFetchingMore && (
+             <div className="flex items-center gap-3 text-muted-foreground animate-in fade-in slide-in-from-bottom-2">
+               <IconLoader className="animate-spin" size={20} />
+               <span className="text-sm font-medium">Loading more videos...</span>
+             </div>
+          )}
+        </div>
       </div>
     </main>
   )

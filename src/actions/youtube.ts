@@ -156,15 +156,19 @@ export const fetchChannelByHandle = createServerFn({ method: "GET" })
   });
 
 export const fetchVideosByPlaylistId = createServerFn({ method: "GET" })
-  .inputValidator((playlistId: string) => playlistId)
-  .handler(async ({ data: playlistId }) => {
+  .inputValidator((data: { playlistId: string; pageToken?: string }) => data)
+  .handler(async ({ data }) => {
+    const { playlistId, pageToken } = data;
     const apiKey = getEnvVar("YOUTUBE_API_KEY")?.trim();
     if (!apiKey) {
       console.error("[YouTube API] YOUTUBE_API_KEY is missing or empty");
       throw new Error("YouTube API Key is not configured.");
     }
 
-    const url = `https://www.googleapis.com/youtube/v3/playlistItems?playlistId=${encodeURIComponent(playlistId)}&part=snippet,contentDetails&key=${apiKey}&maxResults=10`;
+    let url = `https://www.googleapis.com/youtube/v3/playlistItems?playlistId=${encodeURIComponent(playlistId)}&part=snippet,contentDetails&key=${apiKey}&maxResults=10`;
+    if (pageToken) {
+      url += `&pageToken=${encodeURIComponent(pageToken)}`;
+    }
 
     console.log(
       `[YouTube API] Fetching from ${url.replace(apiKey, "REDACTED")}`,
@@ -191,10 +195,10 @@ export const fetchVideosByPlaylistId = createServerFn({ method: "GET" })
 
       if (!data.items || data.items.length === 0) {
         console.log(`[YouTube API] No items found for ${playlistId}`);
-        return null;
+        return { videos: [], nextPageToken: null };
       }
 
-      return data.items.map((item: any) => ({
+      const videos = data.items.map((item: any) => ({
         id: item.contentDetails.videoId, // The official Video ID
         title: item.snippet.title,
         thumbnail:
@@ -204,6 +208,8 @@ export const fetchVideosByPlaylistId = createServerFn({ method: "GET" })
         channelTitle: item.snippet.channelTitle,
         channelId: item.snippet.channelId,
       }));
+
+      return { videos, nextPageToken: data.nextPageToken || null };
     } catch (e: any) {
       console.error("[YouTube API] Unexpected error:", e);
       throw e;
@@ -212,46 +218,62 @@ export const fetchVideosByPlaylistId = createServerFn({ method: "GET" })
 
 export const fetchFeedForUser = createServerFn({
   method: "GET",
-}).handler(async () => {
-  const session = await ensureSession();
-  const userId = session.user.id;
-  if (!userId) throw new Error("Unauthorized");
+})
+  .inputValidator((tokens?: Record<string, string>) => tokens)
+  .handler(async ({ data: tokens }) => {
+    const session = await ensureSession();
+    const userId = session.user.id;
+    if (!userId) throw new Error("Unauthorized");
 
-  const userChannels = await db.query.channels.findMany({
-    where: eq(channels.userId, userId),
-    with: {
-      youtubeChannel: true,
-    },
-  });
-
-  if (userChannels.length === 0) return [];
-
-  const allVideosPromises = userChannels.map(async (uc) => {
-    const playlistId = uc.youtubeChannel?.uploadsPlaylistId;
-    if (!playlistId) return [];
-    
-    // Fetch the videos
-    const videos = await fetchVideosByPlaylistId({ data: playlistId });
-    
-    // Attach the cached channel avatar to every video
-    if (!videos || !Array.isArray(videos)) return [];
-    
-    return videos.map((v: any) => ({
-      ...v,
-      channelAvatar: uc.youtubeChannel?.thumbnailMedium // From the JOINed youtubeChannels table
-    }));
-  });
-
-  const videosByChannel = await Promise.all(allVideosPromises);
-
-  const allVideos = videosByChannel
-    .filter((v) => v !== null)
-    .flat()
-    .sort((a: any, b: any) => {
-      return (
-        new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
-      );
+    const userChannels = await db.query.channels.findMany({
+      where: eq(channels.userId, userId),
+      with: {
+        youtubeChannel: true,
+      },
     });
 
-  return allVideos;
-});
+    if (userChannels.length === 0) return { videos: [], nextPageTokens: {} };
+
+    const allResultsPromises = userChannels.map(async (uc) => {
+      const playlistId = uc.youtubeChannel?.uploadsPlaylistId;
+      if (!playlistId) return { videos: [], nextPageToken: null, channelId: uc.handle };
+
+      const pageToken = tokens?.[playlistId];
+      
+      // Fetch the videos
+      const result = await fetchVideosByPlaylistId({ data: { playlistId, pageToken } });
+      
+      if (!result || !result.videos) return { videos: [], nextPageToken: null, channelId: uc.handle };
+      
+      const videosWithAvatar = result.videos.map((v: any) => ({
+        ...v,
+        channelAvatar: uc.youtubeChannel?.thumbnailMedium
+      }));
+
+      return { 
+        videos: videosWithAvatar, 
+        nextPageToken: result.nextPageToken,
+        playlistId 
+      };
+    });
+
+    const resultsByChannel = await Promise.all(allResultsPromises);
+
+    const allVideos = resultsByChannel
+      .map(r => r.videos)
+      .flat()
+      .sort((a: any, b: any) => {
+        return (
+          new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+        );
+      });
+
+    const nextPageTokens: Record<string, string> = {};
+    resultsByChannel.forEach(r => {
+      if (r.playlistId && r.nextPageToken) {
+        nextPageTokens[r.playlistId] = r.nextPageToken;
+      }
+    });
+
+    return { videos: allVideos, nextPageTokens };
+  });
