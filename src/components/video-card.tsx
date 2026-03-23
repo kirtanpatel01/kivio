@@ -27,6 +27,11 @@ function VideoCard({ video }: { video: any }) {
           alt={video.title}
           className="w-full h-full object-cover group-hover:scale-[1.01] transition-transform duration-300 z-20"
         />
+        {video.duration && (
+          <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/80 text-[10px] sm:text-xs font-bold text-white rounded-md backdrop-blur-sm z-30">
+            {video.duration}
+          </div>
+        )}
       </div>
 
       {/* Info Section */}

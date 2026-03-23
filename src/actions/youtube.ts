@@ -24,6 +24,19 @@ function getEnvVar(key: string): string | undefined {
   return undefined;
 }
 
+function parseISO8601Duration(duration: string) {
+  const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return "";
+  const hours = match[1] ? parseInt(match[1]) : 0;
+  const minutes = match[2] ? parseInt(match[2]) : 0;
+  const seconds = match[3] ? parseInt(match[3]) : 0;
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 export const fetchChannelByHandle = createServerFn({ method: "GET" })
@@ -198,16 +211,28 @@ export const fetchVideosByPlaylistId = createServerFn({ method: "GET" })
         return { videos: [], nextPageToken: null };
       }
 
-      const videos = data.items.map((item: any) => ({
-        id: item.contentDetails.videoId, // The official Video ID
-        title: item.snippet.title,
-        thumbnail:
-          item.snippet.thumbnails?.high?.url ||
-          item.snippet.thumbnails?.default?.url,
-        publishedAt: item.snippet.publishedAt,
-        channelTitle: item.snippet.channelTitle,
-        channelId: item.snippet.channelId,
-      }));
+      // Fetch durations in batch
+      const videoIds = data.items.map((item: any) => item.contentDetails.videoId).join(",");
+      const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?id=${videoIds}&part=contentDetails&key=${apiKey}`;
+      const detailsRes = await fetch(detailsUrl);
+      const detailsData = await detailsRes.json();
+      const durationMap = new Map(detailsData.items.map((v: any) => [v.id, v.contentDetails.duration]));
+
+      const videos = data.items.map((item: any) => {
+        const videoId = item.contentDetails.videoId;
+        const duration = durationMap.get(videoId);
+        return {
+          id: videoId,
+          title: item.snippet.title,
+          thumbnail:
+            item.snippet.thumbnails?.high?.url ||
+            item.snippet.thumbnails?.default?.url,
+          publishedAt: item.snippet.publishedAt,
+          channelTitle: item.snippet.channelTitle,
+          channelId: item.snippet.channelId,
+          duration: duration ? parseISO8601Duration(duration) : null,
+        }
+      });
 
       return { videos, nextPageToken: data.nextPageToken || null };
     } catch (e: any) {
@@ -276,4 +301,54 @@ export const fetchFeedForUser = createServerFn({
     });
 
     return { videos: allVideos, nextPageTokens };
+  });
+
+export const fetchVideoDetails = createServerFn({ method: "GET" })
+  .inputValidator((videoId: string) => videoId)
+  .handler(async ({ data: videoId }) => {
+    const apiKey = getEnvVar("YOUTUBE_API_KEY")?.trim();
+    if (!apiKey) {
+      console.error("[YouTube API] YOUTUBE_API_KEY is missing or empty");
+      throw new Error("YouTube API Key is not configured.");
+    }
+
+    const url = `https://www.googleapis.com/youtube/v3/videos?id=${encodeURIComponent(videoId)}&part=snippet,statistics,contentDetails&key=${apiKey}`;
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`YouTube API error (${res.status}): ${body}`);
+      }
+
+      const data = await res.json();
+      if (!data.items || data.items.length === 0) return null;
+
+      const item = data.items[0];
+
+      // Fetch channel details for avatar and sub count
+      const channelId = item.snippet.channelId;
+      const channelUrl = `https://www.googleapis.com/youtube/v3/channels?id=${channelId}&part=snippet,statistics,contentDetails&key=${apiKey}`;
+      const channelRes = await fetch(channelUrl);
+      const channelData = await channelRes.json();
+      const channelItem = channelData.items?.[0];
+
+      return {
+        id: item.id,
+        title: item.snippet.title,
+        description: item.snippet.description,
+        publishedAt: item.snippet.publishedAt,
+        viewCount: item.statistics.viewCount,
+        likeCount: item.statistics.likeCount,
+        duration: item.contentDetails.duration ? parseISO8601Duration(item.contentDetails.duration) : null,
+        channelId: item.snippet.channelId,
+        channelTitle: item.snippet.channelTitle,
+        channelAvatar: channelItem?.snippet.thumbnails.medium.url,
+        subscriberCount: channelItem?.statistics.subscriberCount,
+        uploadsPlaylistId: channelItem?.contentDetails?.relatedPlaylists?.uploads,
+      };
+    } catch (e: any) {
+      console.error("[YouTube API] fetchVideoDetails error:", e);
+      throw e;
+    }
   });

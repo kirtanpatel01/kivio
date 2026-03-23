@@ -1,4 +1,4 @@
-import { IconHistory, IconSearch, IconTrash, IconX } from "@tabler/icons-react";
+import { IconSearch, IconTrash, IconX } from "@tabler/icons-react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 
@@ -170,7 +170,7 @@ function RouteComponent() {
                   <img
                     src={video.thumbnail}
                     alt={video.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
                   />
                   <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/80 text-[10px] font-bold text-white rounded-md backdrop-blur-sm">
                     {video.duration}
@@ -179,23 +179,23 @@ function RouteComponent() {
 
                 {/* Content */}
                 <div className="flex-1 flex flex-col justify-center gap-1 overflow-hidden pr-10">
-                  <h3 className="text-base sm:text-lg font-bold line-clamp-2 leading-tight group-hover:text-primary transition-colors">
+                  <h3 className="font-semibold line-clamp-2 leading-tight group-hover:text-primary transition-colors">
                     {video.title}
                   </h3>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                    <p className="text-sm text-foreground-secondary font-semibold hover:text-primary transition-colors">
+                    <p className="text-sm text-foreground-secondary font-medium hover:text-primary transition-colors">
                       {video.channel}
                     </p>
                     <span className="hidden sm:inline text-foreground-secondary/30">
                       •
                     </span>
-                    <p className="text-xs text-foreground-secondary/70">
+                    <p className="text-sm text-foreground-secondary/70">
                       {video.views} views
                     </p>
                     <span className="hidden sm:inline text-foreground-secondary/30">
                       •
                     </span>
-                    <p className="text-xs text-foreground-secondary/70 italic">
+                    <p className="text-sm text-foreground-secondary/70 italic">
                       Watched {video.time}
                     </p>
                   </div>
