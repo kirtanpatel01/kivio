@@ -1,41 +1,12 @@
+
 import { createServerFn } from "@tanstack/react-start";
 import { eq } from "drizzle-orm";
 import { db } from "#/db";
 import { channels, youtubeChannels } from "#/db/schema";
-import { resolve } from "node:path";
-import { readFileSync } from "node:fs";
-import { type YouTubeChannelDetails } from "#/lib/youtube";
+import { type YouTubeChannelDetails, type YouTubeVideo } from "#/types";
 import { ensureSession } from "#/lib/auth.functions";
-
-function getEnvVar(key: string): string | undefined {
-  if (process.env[key]) return process.env[key];
-  try {
-    const envPath = resolve(process.cwd(), ".env");
-    const content = readFileSync(envPath, "utf-8");
-    for (const line of content.split("\n")) {
-      const trimmed = line.trim();
-      if (trimmed.startsWith("#") || !trimmed) continue;
-      const [k, ...rest] = trimmed.split("=");
-      if (k?.trim() === key) return rest.join("=").trim();
-    }
-  } catch {
-    // .env file doesn't exist
-  }
-  return undefined;
-}
-
-function parseISO8601Duration(duration: string) {
-  const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-  if (!match) return "";
-  const hours = match[1] ? parseInt(match[1]) : 0;
-  const minutes = match[2] ? parseInt(match[2]) : 0;
-  const seconds = match[3] ? parseInt(match[3]) : 0;
-
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  }
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
+import { parseISO8601Duration } from "#/lib/utils";
+import { getEnvVar } from "#/lib/server-utils";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -56,7 +27,6 @@ export const fetchChannelByHandle = createServerFn({ method: "GET" })
     });
 
     if (cached && Date.now() - cached.fetchedAt.getTime() < CACHE_TTL_MS) {
-      console.log(`[db cache hit] Returning cached data for ${cleanHandle}`);
       const result: YouTubeChannelDetails = {
         id: cached.channelId,
         title: cached.title,
@@ -88,10 +58,6 @@ export const fetchChannelByHandle = createServerFn({ method: "GET" })
 
     const url = `https://www.googleapis.com/youtube/v3/channels?forHandle=${encodeURIComponent(cleanHandle)}&part=snippet,statistics,contentDetails&key=${apiKey}`;
 
-    console.log(
-      `[YouTube API] Fetching from ${url.replace(apiKey, "REDACTED")}`,
-    );
-
     try {
       const res = await fetch(url);
 
@@ -112,7 +78,6 @@ export const fetchChannelByHandle = createServerFn({ method: "GET" })
       const data = await res.json();
 
       if (!data.items || data.items.length === 0) {
-        console.log(`[YouTube API] No items found for ${cleanHandle}`);
         return null;
       }
 
@@ -162,7 +127,7 @@ export const fetchChannelByHandle = createServerFn({ method: "GET" })
         });
 
       return result;
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("[YouTube API] Unexpected error:", e);
       throw e;
     }
@@ -170,7 +135,7 @@ export const fetchChannelByHandle = createServerFn({ method: "GET" })
 
 export const fetchVideosByPlaylistId = createServerFn({ method: "GET" })
   .inputValidator((data: { playlistId: string; pageToken?: string }) => data)
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<{ videos: YouTubeVideo[]; nextPageToken: string | null } | null> => {
     const { playlistId, pageToken } = data;
     const apiKey = getEnvVar("YOUTUBE_API_KEY")?.trim();
     if (!apiKey) {
@@ -182,10 +147,6 @@ export const fetchVideosByPlaylistId = createServerFn({ method: "GET" })
     if (pageToken) {
       url += `&pageToken=${encodeURIComponent(pageToken)}`;
     }
-
-    console.log(
-      `[YouTube API] Fetching from ${url.replace(apiKey, "REDACTED")}`,
-    );
 
     try {
       const res = await fetch(url);
@@ -207,18 +168,28 @@ export const fetchVideosByPlaylistId = createServerFn({ method: "GET" })
       const data = await res.json();
 
       if (!data.items || data.items.length === 0) {
-        console.log(`[YouTube API] No items found for ${playlistId}`);
         return { videos: [], nextPageToken: null };
       }
 
       // Fetch durations in batch
-      const videoIds = data.items.map((item: any) => item.contentDetails.videoId).join(",");
+      const videoIds = data.items.map((item: { contentDetails: { videoId: string } }) => item.contentDetails.videoId).join(",");
       const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?id=${videoIds}&part=contentDetails&key=${apiKey}`;
       const detailsRes = await fetch(detailsUrl);
       const detailsData = await detailsRes.json();
-      const durationMap = new Map(detailsData.items.map((v: any) => [v.id, v.contentDetails.duration]));
+      const durationMap = new Map<string, string>(
+        detailsData.items.map((v: { id: string; contentDetails: { duration: string } }) => [v.id, v.contentDetails.duration])
+      );
 
-      const videos = data.items.map((item: any) => {
+      const videos = data.items.map((item: { 
+        contentDetails: { videoId: string }; 
+        snippet: { 
+          title: string; 
+          thumbnails: { high?: { url: string }; default?: { url: string } };
+          publishedAt: string;
+          channelTitle: string;
+          channelId: string;
+        } 
+      }) => {
         const videoId = item.contentDetails.videoId;
         const duration = durationMap.get(videoId);
         return {
@@ -226,7 +197,7 @@ export const fetchVideosByPlaylistId = createServerFn({ method: "GET" })
           title: item.snippet.title,
           thumbnail:
             item.snippet.thumbnails?.high?.url ||
-            item.snippet.thumbnails?.default?.url,
+            item.snippet.thumbnails?.default?.url || "",
           publishedAt: item.snippet.publishedAt,
           channelTitle: item.snippet.channelTitle,
           channelId: item.snippet.channelId,
@@ -235,7 +206,7 @@ export const fetchVideosByPlaylistId = createServerFn({ method: "GET" })
       });
 
       return { videos, nextPageToken: data.nextPageToken || null };
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("[YouTube API] Unexpected error:", e);
       throw e;
     }
@@ -268,11 +239,11 @@ export const fetchFeedForUser = createServerFn({
       // Fetch the videos
       const result = await fetchVideosByPlaylistId({ data: { playlistId, pageToken } });
       
-      if (!result || !result.videos) return { videos: [], nextPageToken: null, channelId: uc.handle };
+      if (!result || !result.videos) return { videos: [], nextPageToken: null, playlistId };
       
-      const videosWithAvatar = result.videos.map((v: any) => ({
+      const videosWithAvatar = result.videos.map((v) => ({
         ...v,
-        channelAvatar: uc.youtubeChannel?.thumbnailMedium
+        channelAvatar: uc.youtubeChannel?.thumbnailMedium ?? ""
       }));
 
       return { 
@@ -287,7 +258,7 @@ export const fetchFeedForUser = createServerFn({
     const allVideos = resultsByChannel
       .map(r => r.videos)
       .flat()
-      .sort((a: any, b: any) => {
+      .sort((a, b) => {
         return (
           new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
         );
@@ -305,7 +276,7 @@ export const fetchFeedForUser = createServerFn({
 
 export const fetchVideoDetails = createServerFn({ method: "GET" })
   .inputValidator((videoId: string) => videoId)
-  .handler(async ({ data: videoId }) => {
+  .handler(async ({ data: videoId }): Promise<YouTubeVideo | null> => {
     const apiKey = getEnvVar("YOUTUBE_API_KEY")?.trim();
     if (!apiKey) {
       console.error("[YouTube API] YOUTUBE_API_KEY is missing or empty");
@@ -336,6 +307,7 @@ export const fetchVideoDetails = createServerFn({ method: "GET" })
       return {
         id: item.id,
         title: item.snippet.title,
+        thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.default?.url || "",
         description: item.snippet.description,
         publishedAt: item.snippet.publishedAt,
         viewCount: item.statistics.viewCount,
@@ -347,7 +319,7 @@ export const fetchVideoDetails = createServerFn({ method: "GET" })
         subscriberCount: channelItem?.statistics.subscriberCount,
         uploadsPlaylistId: channelItem?.contentDetails?.relatedPlaylists?.uploads,
       };
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("[YouTube API] fetchVideoDetails error:", e);
       throw e;
     }

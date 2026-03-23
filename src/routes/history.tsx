@@ -2,6 +2,7 @@ import { IconHistory, IconSearch, IconTrash, IconX } from "@tabler/icons-react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { getHistory, deleteHistoryItem, clearHistory } from "#/actions/history";
+import { getTimeAgo } from "#/lib/utils";
 
 export const Route = createFileRoute("/history")({
   loader: async () => {
@@ -10,22 +11,6 @@ export const Route = createFileRoute("/history")({
   },
   component: RouteComponent,
 });
-
-function getTimeAgo(dateStr: string | Date) {
-  const date = new Date(dateStr);
-  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
-  let interval = seconds / 31536000;
-  if (interval > 1) return Math.floor(interval) + " years ago";
-  interval = seconds / 2592000;
-  if (interval > 1) return Math.floor(interval) + " months ago";
-  interval = seconds / 86400;
-  if (interval > 1) return Math.floor(interval) + " days ago";
-  interval = seconds / 3600;
-  if (interval > 1) return Math.floor(interval) + " hours ago";
-  interval = seconds / 60;
-  if (interval > 1) return Math.floor(interval) + " minutes ago";
-  return Math.floor(seconds) + " seconds ago";
-}
 
 function RouteComponent() {
   const { initialHistory } = Route.useLoaderData();

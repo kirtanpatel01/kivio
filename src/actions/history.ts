@@ -40,7 +40,7 @@ export const recordHistory = createServerFn({ method: "POST" })
       });
 
       return { success: true, updated: false };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[History Action] recordHistory error:", err);
       throw err;
     }
@@ -56,7 +56,7 @@ export const getHistory = createServerFn({ method: "GET" }).handler(async () => 
       where: eq(history.userId, userId),
       orderBy: [desc(history.watchedAt)],
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[History Action] getHistory error:", err);
     throw err;
   }
@@ -73,7 +73,7 @@ export const getWatchedVideoIds = createServerFn({ method: "GET" }).handler(asyn
       columns: { videoId: true },
     });
     return historyItems.map((h) => h.videoId);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[History Action] getWatchedVideoIds error:", err);
     throw err;
   }
@@ -89,7 +89,7 @@ export const deleteHistoryItem = createServerFn({ method: "POST" })
 
       await db.delete(history).where(and(eq(history.id, id), eq(history.userId, userId)));
       return { success: true };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[History Action] deleteHistoryItem error:", err);
       throw err;
     }
@@ -103,7 +103,7 @@ export const clearHistory = createServerFn({ method: "POST" }).handler(async () 
 
     await db.delete(history).where(eq(history.userId, userId));
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[History Action] clearHistory error:", err);
     throw err;
   }

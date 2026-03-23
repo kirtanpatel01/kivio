@@ -1,8 +1,10 @@
 import { fetchVideoDetails, fetchVideosByPlaylistId } from "#/actions/youtube";
 import { recordHistory, getWatchedVideoIds } from "#/actions/history";
+import type { YouTubeVideo } from "#/types";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { IconChevronDown, IconChevronLeft, IconHistory } from "@tabler/icons-react";
+import { formatCount, getTimeAgo } from "#/lib/utils";
 
 export const Route = createFileRoute("/videos/$videoId")({
   loader: async ({ params: { videoId } }) => {
@@ -26,29 +28,6 @@ export const Route = createFileRoute("/videos/$videoId")({
   },
   component: RouteComponent,
 });
-
-function formatCount(count: string | number) {
-  const n = parseInt(count.toString());
-  if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
-  if (n >= 1000) return (n / 1000).toFixed(1) + "K";
-  return n.toLocaleString();
-}
-
-function getTimeAgo(dateStr: string) {
-  const date = new Date(dateStr);
-  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
-  let interval = seconds / 31536000;
-  if (interval > 1) return Math.floor(interval) + " years ago";
-  interval = seconds / 2592000;
-  if (interval > 1) return Math.floor(interval) + " months ago";
-  interval = seconds / 86400;
-  if (interval > 1) return Math.floor(interval) + " days ago";
-  interval = seconds / 3600;
-  if (interval > 1) return Math.floor(interval) + " hours ago";
-  interval = seconds / 60;
-  if (interval > 1) return Math.floor(interval) + " minutes ago";
-  return Math.floor(seconds) + " seconds ago";
-}
 
 function LinkifiedText({ text }: { text: string }) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -77,7 +56,7 @@ function RouteComponent() {
   const [showDescription, setShowDescription] = useState(false);
 
   const filteredSuggestions = useMemo(() => {
-    return suggestions.filter((v: any) => v.id !== video?.id);
+    return (suggestions as YouTubeVideo[]).filter((v) => v.id !== video?.id);
   }, [suggestions, video?.id]);
 
   if (!video) {
@@ -139,7 +118,7 @@ function RouteComponent() {
                   </div>
 
                   <div className="border-l border-primary/30 pl-4 flex flex-col gap-0.5 text-sm">
-                    <span className="font-semibold">{formatCount(video.viewCount)} views</span>
+                    <span className="font-semibold">{formatCount(video.viewCount || 0)} views</span>
                     <span className="text-xs text-foreground-secondary italic">
                       {new Date(video.publishedAt).toLocaleDateString()}
                     </span>
@@ -172,7 +151,7 @@ function RouteComponent() {
               }`}
             >
               <div className="prose prose-sm dark:prose-invert max-w-none text-foreground/80 leading-relaxed whitespace-pre-wrap selection:bg-primary/20">
-                <LinkifiedText text={video.description} />
+                <LinkifiedText text={video.description || ""} />
               </div>
             </div>
           </div>
@@ -186,7 +165,7 @@ function RouteComponent() {
         </h3>
 
         <div className="flex flex-col gap-4">
-          {filteredSuggestions.map((v: any) => (
+          {(filteredSuggestions as YouTubeVideo[]).map((v) => (
             <Link 
               key={v.id} 
               to={`/videos/$videoId`} 

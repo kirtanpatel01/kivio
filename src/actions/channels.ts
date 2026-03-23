@@ -11,7 +11,6 @@ export const getUserChannels = createServerFn({ method: "GET" }).handler(
       const session = await ensureSession();
       const userId = session.user.id;
       if (!userId) {
-        console.warn("[Channels Action] Not logged in, returning empty list");
         return [];
       }
 
@@ -21,7 +20,7 @@ export const getUserChannels = createServerFn({ method: "GET" }).handler(
       });
 
       return userChannels;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[Channels Action] getUserChannels error:", err);
       throw err;
     }
@@ -70,7 +69,7 @@ export const addUserChannel = createServerFn({ method: "POST" })
         .returning();
 
       return newChannel;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[Channels Action] addUserChannel error:", err);
       throw err;
     }
@@ -89,7 +88,7 @@ export const removeUserChannel = createServerFn({ method: "POST" })
         .where(and(eq(channels.id, id), eq(channels.userId, userId)));
 
       return { success: true };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[Channels Action] removeUserChannel error:", err);
       throw err;
     }
@@ -110,7 +109,7 @@ export const updateUserChannel = createServerFn({ method: "POST" })
         .returning();
 
       return updated;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[Channels Action] updateUserChannel error:", err);
       throw err;
     }

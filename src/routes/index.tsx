@@ -2,6 +2,7 @@ import VideoCard from '#/components/video-card'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { fetchFeedForUser } from '#/actions/youtube'
 import { getWatchedVideoIds } from '#/actions/history'
+import type { YouTubeVideo } from '#/types'
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { IconLoader } from '@tabler/icons-react'
 
@@ -29,13 +30,13 @@ function Dashboard() {
   const [selectedChannelIds, setSelectedChannelIds] = useState<string[]>([])
 
   const uniqueChannels = useMemo(() => {
-    const channelMap = new Map()
-    videos.forEach((v: any) => {
+    const channelMap = new Map<string, { id: string; title: string; avatar: string }>()
+    videos.forEach((v: YouTubeVideo) => {
       if (!channelMap.has(v.channelId)) {
         channelMap.set(v.channelId, {
           id: v.channelId,
           title: v.channelTitle,
-          avatar: v.channelAvatar,
+          avatar: v.channelAvatar || "",
         })
       }
     })
@@ -44,7 +45,7 @@ function Dashboard() {
 
   const filteredVideos = useMemo(() => {
     if (selectedChannelIds.length === 0) return videos
-    return videos.filter((v: any) => selectedChannelIds.includes(v.channelId))
+    return videos.filter((v: YouTubeVideo) => selectedChannelIds.includes(v.channelId))
   }, [videos, selectedChannelIds]);
 
   const toggleChannel = (id: string) => {
@@ -136,7 +137,7 @@ function Dashboard() {
             All Channels
           </button>
 
-          {uniqueChannels.map((channel: any) => (
+          {uniqueChannels.map((channel) => (
             <button
               key={channel.id}
               onClick={() => toggleChannel(channel.id)}
@@ -166,7 +167,7 @@ function Dashboard() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {filteredVideos.map((video: any) => (
+            {filteredVideos.map((video) => (
               <Link
                 to={`/videos/$videoId`}
                 params={{ videoId: video.id }}

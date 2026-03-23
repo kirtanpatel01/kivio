@@ -28,8 +28,8 @@ function ChannelInput() {
 
       setNewChannelName("");
       router.invalidate(); // Refresh!
-    } catch (err: any) {
-      setError(err.message || "Failed to add channel");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to add channel");
     } finally {
       setAdding(false);
     }

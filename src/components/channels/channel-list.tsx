@@ -42,8 +42,8 @@ export default function ChannelList({ channels }: { channels: Channel[] }) {
       await fetchChannelByHandle({ data: normalized });
       await updateUserChannel({ data: { id: editingId, handle: normalized } });
       handleCancelEdit();
-    } catch (err: any) {
-      console.log(err);
+    } catch (err: unknown) {
+      console.error(err);
     } finally {
       setSaving(false);
     }
@@ -55,8 +55,8 @@ export default function ChannelList({ channels }: { channels: Channel[] }) {
       setDeletingId(channel.id);
       await removeUserChannel({ data: channel.id });
       router.invalidate();
-    } catch (err: any) {
-      console.log(err);
+    } catch (err: unknown) {
+      console.error(err);
     } finally {
       setDeleting(false);
       setDeletingId(null);
