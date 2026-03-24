@@ -96,7 +96,7 @@ function Dashboard() {
   if (!videos || videos.length === 0) {
     return (
       <div className="h-[80vh] flex flex-col items-center justify-center text-center gap-4">
-        <img src="/kivio-svg.svg" alt="Kivio" className="size-24 opacity-20 p-4 bg-black dark:bg-white rounded-4xl mb-2" />
+        <img src="/logo.png" alt="Kivio" className="size-24 opacity-20 p-4 bg-black dark:bg-white rounded-4xl mb-2" />
         <h2 className="text-2xl font-bold">Your feed is empty</h2>
         <p className="text-muted-foreground">
           Add some YouTube handles in the Channels page to see videos here.

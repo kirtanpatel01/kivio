@@ -90,7 +90,7 @@ function RouteComponent() {
         <div className="flex flex-col gap-4 p-4 sm:p-6 pt-32 sm:pt-36">
           {filteredHistory.length === 0 ? (
             <div className="text-center py-20 bg-secondary/5 rounded-3xl border border-dashed border-border/50">
-              <img src="/kivio-svg.svg" alt="Kivio" className="size-16 opacity-15 mx-auto p-3 bg-black dark:bg-white rounded-2xl mb-4" />
+              <img src="/logo.png" alt="Kivio" className="size-16 opacity-15 mx-auto p-3 bg-black dark:bg-white rounded-2xl mb-4" />
               <p className="text-foreground-secondary font-semibold italic">
                 {search
                   ? "No matches found in your history"

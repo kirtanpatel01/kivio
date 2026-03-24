@@ -35,7 +35,7 @@ export default function Header() {
             to="/"
             className="flex items-center gap-2 text-lg sm:text-2xl font-extrabold text-primary group"
           >
-            <img src="/logo.png" alt="Kivio" className="size-8 sm:size-10 object-contain rounded-0 p-0" />
+            <img src="/logo.png" alt="Kivio" className="w-8 h-10" />
             {/* <span className="group-hover:opacity-80">Kiv/io</span> */}
           </Link>
         </h2>
