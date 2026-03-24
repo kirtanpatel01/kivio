@@ -34,7 +34,7 @@ function UserDropdown() {
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setOpen((prev) => !prev)}
-            className="cursor-pointer rounded-full ring-2 ring-transparent hover:ring-primary/40 transition-all duration-200"
+            className="cursor-pointer rounded-full ring-2 ring-transparent hover:ring-primary/40"
           >
             <img
               src={user?.image || "/avatar.png"}
@@ -76,7 +76,7 @@ function UserDropdown() {
                       await authClient.signOut();
                       setOpen(false);
                     }}
-                    className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-lg hover:bg-secondary/50 cursor-pointer transition-colors duration-150"
+                    className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-lg hover:bg-secondary/50 cursor-pointer"
                   >
                     <IconLogout size={16} />
                     <span>Log out</span>

@@ -80,7 +80,7 @@ export default function ChannelList({ channels }: { channels: Channel[] }) {
             channels.map((channel) => (
               <div
                 key={channel.id}
-                className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                className={`flex items-center justify-between p-2 rounded-lg cursor-pointer ${
                   handle === channel.handle
                     ? "bg-primary/10 border border-primary/20"
                     : "hover:bg-secondary/30 border border-transparent"
@@ -94,7 +94,7 @@ export default function ChannelList({ channels }: { channels: Channel[] }) {
                 {editingId === channel.id ? (
                   <div className="flex flex-1 gap-2">
                     <input
-                      className="w-full p-1 border border-primary/40 rounded-md ring-2 ring-transparent focus:ring-primary/50 focus:outline-none focus:border-transparent transition-all duration-300"
+                      className="w-full p-1 border border-primary/40 rounded-md ring-2 ring-transparent focus:ring-primary/50 focus:outline-none focus:border-transparent"
                       value={editingName}
                       onChange={(e) => setEditingName(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handleSaveEdit()}
@@ -108,7 +108,7 @@ export default function ChannelList({ channels }: { channels: Channel[] }) {
                           handleSaveEdit();
                         }}
                         disabled={saving}
-                        className="px-2 bg-secondary hover:bg-secondary/80 rounded-full cursor-pointer transition-all duration-300 disabled:opacity-50"
+                        className="px-2 bg-secondary hover:bg-secondary/80 rounded-full cursor-pointer disabled:opacity-50"
                       >
                         {saving ? (
                           <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -121,7 +121,7 @@ export default function ChannelList({ channels }: { channels: Channel[] }) {
                           e.stopPropagation();
                           handleCancelEdit();
                         }}
-                        className="p-2 bg-primary/20 hover:bg-primary/30 rounded-full cursor-pointer transition-all duration-300"
+                        className="p-2 bg-primary/20 hover:bg-primary/30 rounded-full cursor-pointer"
                       >
                         <IconX size={16} />
                       </button>
@@ -138,7 +138,7 @@ export default function ChannelList({ channels }: { channels: Channel[] }) {
                           e.stopPropagation();
                           startEdit(channel);
                         }}
-                        className="p-1.5 bg-secondary/70 hover:bg-secondary text-primary-foreground rounded-md cursor-pointer transition-all duration-300"
+                        className="p-1.5 bg-secondary/70 hover:bg-secondary text-primary-foreground rounded-md cursor-pointer"
                       >
                         <IconPencil size={14} />
                       </button>
@@ -148,7 +148,7 @@ export default function ChannelList({ channels }: { channels: Channel[] }) {
                           handleDelete(channel);
                         }}
                         disabled={deleting}
-                        className="p-1.5 bg-primary/40 hover:bg-primary/60 text-primary-foreground rounded-md cursor-pointer transition-all duration-300 disabled:opacity-50"
+                        className="p-1.5 bg-primary/40 hover:bg-primary/60 text-primary-foreground rounded-md cursor-pointer disabled:opacity-50"
                       >
                         {deleting && deletingId === channel.id ? (
                           <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

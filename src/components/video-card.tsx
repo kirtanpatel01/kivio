@@ -24,14 +24,14 @@ function VideoCard({ video, isWatched }: { video: YouTubeVideo; isWatched?: bool
       className="w-full group cursor-pointer flex flex-col gap-3 relative"
       onClick={handleRecordHistory}
     >
-      <div className="w-full h-full inset-0 absolute group-hover:bg-primary/5 z-0 group-hover:scale-[1.02] rounded-xl transition-all duration-300" />
+      <div className="w-full h-full inset-0 absolute group-hover:bg-primary/5 z-0 group-hover:scale-[1.02] rounded-xl" />
       
       {/* Thumbnail Container */}
       <div className="relative w-full aspect-video overflow-hidden rounded-2xl bg-secondary/20">
         <img
           src={video.thumbnail}
           alt={video.title}
-          className="w-full h-full object-cover group-hover:scale-[1.01] transition-transform duration-300 z-20"
+          className="w-full h-full object-cover group-hover:scale-[1.01] z-20"
         />
         {isWatched && (
           <div className="absolute top-2 right-2 p-1.5 bg-black/60 backdrop-blur-md rounded-full text-white z-30 shadow-lg border border-white/10">
@@ -57,7 +57,7 @@ function VideoCard({ video, isWatched }: { video: YouTubeVideo; isWatched?: bool
             {video.title}
           </h3>
           <div className="flex items-center justify-between">
-            <p className="text-xs sm:text-sm text-foreground/60 font-medium hover:text-primary transition-colors truncate">
+            <p className="text-xs sm:text-sm text-foreground/60 font-medium hover:text-primary truncate">
               {video.channelTitle}
             </p>
             <p className="text-[10px] sm:text-xs text-foreground/40 font-medium">

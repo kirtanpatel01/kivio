@@ -18,6 +18,9 @@ export const Route = createFileRoute('/')({
       watchedIds: watchedIds || []
     }
   },
+  head: () => ({
+    meta: [{ title: 'Feed | Kivio' }]
+  }),
   component: Dashboard,
 })
 
@@ -93,13 +96,14 @@ function Dashboard() {
   if (!videos || videos.length === 0) {
     return (
       <div className="h-[80vh] flex flex-col items-center justify-center text-center gap-4">
+        <img src="/kivio-svg.svg" alt="Kivio" className="size-24 opacity-20 p-4 bg-black dark:bg-white rounded-4xl mb-2" />
         <h2 className="text-2xl font-bold">Your feed is empty</h2>
         <p className="text-muted-foreground">
           Add some YouTube handles in the Channels page to see videos here.
         </p>
         <Link
           to="/channels"
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity"
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90"
         >
           Go to Channels
         </Link>
@@ -118,7 +122,7 @@ function Dashboard() {
           {selectedChannelIds.length > 0 && (
             <button
               onClick={() => setSelectedChannelIds([])}
-              className="text-[10px] font-bold text-primary/80 tracking-wider hover:bg-pri transition-opacity cursor-pointer"
+              className="text-[10px] font-bold text-primary/80 tracking-wider hover:bg-pri cursor-pointer"
             >
               Reset
             </button>
@@ -128,7 +132,7 @@ function Dashboard() {
         <nav className="flex flex-col gap-2 overflow-y-auto pr-2 custom-scrollbar">
           <button
             onClick={() => setSelectedChannelIds([])}
-            className={`flex items-center p-3 rounded-xl text-sm font-semibold transition-all duration-200 border cursor-pointer ${
+            className={`flex items-center p-3 rounded-xl text-sm font-semibold border cursor-pointer ${
               selectedChannelIds.length === 0
                 ? 'bg-primary/80 hover:bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20'
                 : 'bg-transparent border-transparent text-foreground/80 hover:bg-secondary/60 hover:text-foreground'
@@ -141,7 +145,7 @@ function Dashboard() {
             <button
               key={channel.id}
               onClick={() => toggleChannel(channel.id)}
-              className={`flex items-center gap-2 p-2 rounded-xl text-sm font-semibold transition-all duration-200 border cursor-pointer ${
+              className={`flex items-center gap-2 p-2 rounded-xl text-sm font-semibold border cursor-pointer ${
                 selectedChannelIds.includes(channel.id)
                   ? 'bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20'
                   : 'bg-transparent border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
@@ -172,7 +176,7 @@ function Dashboard() {
                 to={`/videos/$videoId`}
                 params={{ videoId: video.id }}
                 key={video.id}
-                className="transition-transform duration-300 hover:scale-[1.01]"
+                className="hover:scale-[1.01]"
               >
                 <VideoCard 
                   video={video} 
@@ -186,7 +190,7 @@ function Dashboard() {
         {/* Observer Target & Loading State */}
         <div 
           ref={observerTarget} 
-          className="w-full py-12 flex items-center justify-center transition-opacity duration-300"
+          className="w-full py-12 flex items-center justify-center"
           style={{ opacity: Object.keys(nextPageTokens).length > 0 ? 1 : 0 }}
         >
           {isFetchingMore && (

@@ -26,8 +26,25 @@ export const Route = createFileRoute("/videos/$videoId")({
       watchedIds: watchedIds || []
     };
   },
+  head: ({ loaderData }) => ({
+    meta: [
+      {
+        title: loaderData?.video?.title 
+          ? `${loaderData.video.title} | Kivio` 
+          : "Video | Kivio",
+      },
+      {
+        name: "description",
+        content: loaderData?.video?.description?.slice(0, 160) || "Watch this video on Kivio.",
+      },
+      {
+        property: "og:image",
+        content: loaderData?.video?.thumbnail,
+      },
+    ],
+  }),
   component: RouteComponent,
-});
+})
 
 function LinkifiedText({ text }: { text: string }) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -41,7 +58,7 @@ function LinkifiedText({ text }: { text: string }) {
           href={part}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-primary hover:text-primary/80 transition-colors break-all"
+          className="text-primary hover:text-primary/80 break-all"
         >
           {part}
         </a>
@@ -75,9 +92,9 @@ function RouteComponent() {
         <div className="max-w-7xl mx-auto p-3 sm:p-4 space-y-4">
           <button 
             onClick={() => window.history.back()}
-            className="group flex items-center gap-1 pl-2 pr-4 py-2 rounded-full bg-secondary/80 hover:bg-secondary text-sm font-medium transition-all duration-200 cursor-pointer"
+            className="group flex items-center gap-1 pl-2 pr-4 py-2 rounded-full bg-secondary/80 hover:bg-secondary text-sm font-medium cursor-pointer"
           >
-            <IconChevronLeft size={18} className="group-hover:-translate-x-px transition-transform" />
+            <IconChevronLeft size={18} className="group-hover:-translate-x-px" />
             Back
           </button>
 
@@ -105,7 +122,7 @@ function RouteComponent() {
                     <img
                       src={video.channelAvatar}
                       alt={video.channelTitle}
-                      className="w-12 h-12 rounded-full border-2 border-transparent group-hover:border-primary transition-all object-cover"
+                      className="w-12 h-12 rounded-full border-2 border-transparent group-hover:border-primary object-cover"
                     />
                     <div>
                       <h2 className="font-semibold text-sm sm:text-base">
@@ -128,7 +145,7 @@ function RouteComponent() {
 
               <button
                 onClick={() => setShowDescription(!showDescription)}
-                className={`px-5 py-2 rounded-full transition-all duration-300 flex items-center gap-2 cursor-pointer text-sm font-semibold border ${
+                className={`px-5 py-2 rounded-full flex items-center gap-2 cursor-pointer text-sm font-semibold border ${
                   showDescription
                     ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
                     : "bg-secondary/40 hover:bg-secondary border-transparent"
@@ -137,7 +154,7 @@ function RouteComponent() {
                 Description
                 <IconChevronDown
                   size={18}
-                  className={`transition-transform duration-300 ${showDescription ? "rotate-180" : ""}`}
+                  className={` ${showDescription ? "rotate-180" : ""}`}
                 />
               </button>
             </div>
@@ -183,13 +200,13 @@ function RouteComponent() {
                 }).catch((e) => console.error(e));
               }}
             >
-              <div className="group flex gap-3 cursor-pointer p-2 rounded-xl hover:bg-secondary/40 transition-all duration-300 border border-transparent hover:border-border/10">
+              <div className="group flex gap-3 cursor-pointer p-2 rounded-xl hover:bg-secondary/40 border border-transparent hover:border-border/10">
                 {/* Compact Thumbnail */}
                 <div className="relative w-40 aspect-video rounded-lg overflow-hidden shrink-0 bg-secondary/20">
                   <img
                     src={v.thumbnail}
                     alt={v.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    className="w-full h-full object-cover group-hover:scale-105"
                   />
                   {watchedIds.includes(v.id) && (
                     <div className="absolute top-1.5 right-1.5 p-1 bg-black/60 backdrop-blur-md rounded-full text-white z-30 shadow-md">
@@ -200,7 +217,7 @@ function RouteComponent() {
 
                 {/* Suggestions Info */}
                 <div className="flex flex-col gap-1 overflow-hidden pointer-events-none">
-                  <h4 className="text-sm font-semibold line-clamp-2 leading-tight group-hover:text-primary transition-colors">
+                  <h4 className="text-sm font-semibold line-clamp-2 leading-tight group-hover:text-primary">
                     {v.title}
                   </h4>
                   <div className="flex flex-col">

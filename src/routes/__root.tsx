@@ -18,10 +18,39 @@ export const Route = createRootRoute({
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "Kivio",
+        title: "Kivio - Your Personal YouTube Feed",
+      },
+      {
+        name: "description",
+        content: "Kivio is a minimal YouTube client. Manage your channels, track history and discover new videos with ease.",
+      },
+      {
+        name: "keywords",
+        content: "YouTube, Kivio, Video, Channels, History, Minimalist",
+      },
+      {
+        property: "og:title",
+        content: "Kivio - Your Personal YouTube Feed",
+      },
+      {
+        property: "og:description",
+        content: "Track your YouTube history and manage your favorite channels in one place.",
+      },
+      {
+        property: "og:image",
+        content: "/logo.png",
+      },
+      {
+        name: "twitter:card",
+        content: "summary_large_image",
       },
     ],
     links: [
+      {
+        rel: "icon",
+        type: "image/svg+xml",
+        href: "/kivio-svg.svg",
+      },
       {
         rel: "stylesheet",
         href: appCss,

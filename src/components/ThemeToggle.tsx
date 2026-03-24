@@ -32,6 +32,21 @@ export default function ThemeToggle() {
     applyThemeMode(mode)
   }, [mode])
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.key.toLowerCase() === 'd' &&
+        !['INPUT', 'TEXTAREA', 'SELECT'].includes((event.target as HTMLElement).tagName) &&
+        !(event.target as HTMLElement).isContentEditable
+      ) {
+        toggleMode()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [mode])
+
   function toggleMode() {
     const nextMode: ThemeMode = mode === 'light' ? 'dark' : 'light'
     setMode(nextMode)
@@ -47,7 +62,7 @@ export default function ThemeToggle() {
       onClick={toggleMode}
       aria-label={label}
       title={label}
-      className="rounded-full sm:bg-secondary/60 sm:hover:bg-secondary sm:p-2 transition cursor-pointer"
+      className="rounded-full sm:bg-secondary/60 sm:hover:bg-secondary sm:p-2 cursor-pointer"
     >
       {mode === 'dark' ? <IconMoon size={16} /> : <IconSun size={16} />}
     </button>

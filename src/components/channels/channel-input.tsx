@@ -45,7 +45,7 @@ function ChannelInput() {
       </label>
       <div className="flex gap-2">
         <input
-          className="w-full px-3 py-2 border border-border rounded-lg ring-2 ring-transparent focus:ring-primary/30 focus:outline-none focus:border-transparent transition-all duration-300 disabled:opacity-50"
+          className="w-full px-3 py-2 border border-border rounded-lg ring-2 ring-transparent focus:ring-primary/30 focus:outline-none focus:border-transparent disabled:opacity-50"
           placeholder="@manuarora"
           value={newChannelName}
           onChange={(e) => setNewChannelName(e.target.value)}
@@ -55,7 +55,7 @@ function ChannelInput() {
         <button
           onClick={handleAdd}
           disabled={adding}
-          className="px-3 py-2 bg-secondary/70 hover:bg-secondary rounded-lg cursor-pointer transition-all duration-300 disabled:cursor-not-allowed flex items-center justify-center min-w-[40px]"
+          className="px-3 py-2 bg-secondary/70 hover:bg-secondary rounded-lg cursor-pointer disabled:cursor-not-allowed flex items-center justify-center min-w-[40px]"
         >
           {adding ? (
             <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />

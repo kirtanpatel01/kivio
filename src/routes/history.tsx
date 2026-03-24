@@ -9,6 +9,9 @@ export const Route = createFileRoute("/history")({
     const history = await getHistory();
     return { initialHistory: history || [] };
   },
+  head: () => ({
+    meta: [{ title: 'History | Kivio' }]
+  }),
   component: RouteComponent,
 });
 
@@ -55,7 +58,7 @@ function RouteComponent() {
         <div className="p-4 sm:p-6 space-y-4 fixed inset-x-0 max-w-4xl mx-auto z-10 bg-background">
           <button
             onClick={clearAll}
-            className="w-fit text-xs font-bold tracking-widest text-foreground-secondary hover:text-primary transition-colors cursor-pointer"
+            className="w-fit text-xs font-bold tracking-widest text-foreground-secondary hover:text-primary cursor-pointer"
           >
             Clear All History
           </button>
@@ -64,10 +67,10 @@ function RouteComponent() {
           <div className="relative group">
             <IconSearch
               size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-secondary group-focus-within:text-primary transition-colors"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-secondary group-focus-within:text-primary"
             />
             <input
-              className="w-full pl-10 pr-4 py-3 bg-secondary/15 border border-border rounded-xl ring-2 ring-transparent focus:ring-primary/30 focus:outline-none focus:border-transparent transition-all duration-300 font-medium"
+              className="w-full pl-10 pr-4 py-3 bg-secondary/15 border border-border rounded-xl ring-2 ring-transparent focus:ring-primary/30 focus:outline-none focus:border-transparent font-medium"
               placeholder="Search within history..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -75,7 +78,7 @@ function RouteComponent() {
             {search && (
               <button
                 onClick={() => setSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-secondary hover:text-primary transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-secondary hover:text-primary"
               >
                 <IconX size={18} />
               </button>
@@ -87,6 +90,7 @@ function RouteComponent() {
         <div className="flex flex-col gap-4 p-4 sm:p-6 pt-32 sm:pt-36">
           {filteredHistory.length === 0 ? (
             <div className="text-center py-20 bg-secondary/5 rounded-3xl border border-dashed border-border/50">
+              <img src="/kivio-svg.svg" alt="Kivio" className="size-16 opacity-15 mx-auto p-3 bg-black dark:bg-white rounded-2xl mb-4" />
               <p className="text-foreground-secondary font-semibold italic">
                 {search
                   ? "No matches found in your history"
@@ -99,16 +103,16 @@ function RouteComponent() {
                 key={video.id}
                 to="/videos/$videoId"
                 params={{ videoId: video.videoId }}
-                className="group relative flex flex-col sm:flex-row gap-4 sm:p-3 rounded-2xl hover:bg-secondary/20 transition-all duration-300 border border-transparent hover:border-border/50"
+                className="group relative flex flex-col sm:flex-row gap-4 sm:p-3 rounded-2xl hover:bg-secondary/20 border border-transparent hover:border-border/50"
               >
                 {/* Thumbnail */}
-                <div className="relative w-full sm:w-56 aspect-video rounded-xl overflow-hidden shrink-0 bg-zinc-800 shadow-sm transition-shadow group-hover:shadow-md">
+                <div className="relative w-full sm:w-56 aspect-video rounded-xl overflow-hidden shrink-0 bg-zinc-800 shadow-sm group-hover:shadow-md">
                   <img
                     src={video.thumbnail}
                     alt={video.title}
-                    className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
+                    className="w-full h-full object-cover group-hover:scale-[1.02]"
                   />
-                  <div className="absolute top-2 right-2 p-1.5 bg-black/60 backdrop-blur-md rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute top-2 right-2 p-1.5 bg-black/60 backdrop-blur-md rounded-full text-white opacity-0 group-hover:opacity-100">
                     <IconHistory size={12} />
                   </div>
                   <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/80 text-[10px] font-bold text-white rounded-md backdrop-blur-sm">
@@ -118,11 +122,11 @@ function RouteComponent() {
 
                 {/* Content */}
                 <div className="flex-1 flex flex-col justify-center gap-1 overflow-hidden pr-10">
-                  <h3 className="font-semibold line-clamp-2 leading-tight group-hover:text-primary transition-colors">
+                  <h3 className="font-semibold line-clamp-2 leading-tight group-hover:text-primary">
                     {video.title}
                   </h3>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                    <p className="text-sm text-foreground-secondary font-medium hover:text-primary transition-colors">
+                    <p className="text-sm text-foreground-secondary font-medium hover:text-primary">
                       {video.channelTitle}
                     </p>
                     {video.viewCount && (
@@ -147,7 +151,7 @@ function RouteComponent() {
                 {/* Individual Remove Button */}
                 <button
                   onClick={(e) => removeItem(video.id, e)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-2.5 bg-background border border-border rounded-full text-foreground-secondary hover:text-rose-500 hover:border-rose-200 transition-all cursor-pointer shadow-sm hover:shadow-md active:scale-90"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-2.5 bg-background border border-border rounded-full text-foreground-secondary hover:text-rose-500 hover:border-rose-200 cursor-pointer shadow-sm hover:shadow-md active:scale-90"
                   title="Remove from history"
                 >
                   <IconTrash size={18} />

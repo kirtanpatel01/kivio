@@ -123,7 +123,7 @@ function StatCard({
   label: string;
 }) {
   return (
-    <div className="bg-secondary/20 border border-border/50 rounded-xl p-4 flex flex-col items-center gap-1.5 transition-colors hover:bg-secondary/30">
+    <div className="bg-secondary/20 border border-border/50 rounded-xl p-4 flex flex-col items-center gap-1.5 hover:bg-secondary/30">
       {icon}
       <span className="text-lg font-bold">{value}</span>
       <span className="text-xs text-muted-foreground">{label}</span>
