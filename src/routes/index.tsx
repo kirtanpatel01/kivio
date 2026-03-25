@@ -19,7 +19,8 @@ export const Route = createFileRoute('/')({
     }
   },
   head: () => ({
-    meta: [{ title: 'Feed | Kivio' }]
+    title: 'Feed | Kivio',
+    meta: []
   }),
   component: Dashboard,
 })
@@ -79,7 +80,8 @@ function Dashboard() {
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
+        const entry = entries[0];
+        if (entry && entry.isIntersecting) {
           loadMore()
         }
       },

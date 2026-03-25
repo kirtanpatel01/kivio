@@ -9,6 +9,7 @@ const THEME_INIT_SCRIPT = `(function(){try{var stored=window.localStorage.getIte
 
 export const Route = createRootRoute({
   head: () => ({
+    title: "Kivio - Your Personal YouTube Feed",
     meta: [
       {
         charSet: "utf-8",
@@ -16,9 +17,6 @@ export const Route = createRootRoute({
       {
         name: "viewport",
         content: "width=device-width, initial-scale=1",
-      },
-      {
-        title: "Kivio - Your Personal YouTube Feed",
       },
       {
         name: "description",

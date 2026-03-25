@@ -26,13 +26,10 @@ export const Route = createFileRoute("/channels")({
     return { channels, details };
   },
   head: ({ loaderData }) => ({
-    meta: [
-      {
-        title: loaderData?.details?.title 
-          ? `${loaderData.details.title} | Kivio` 
-          : "Channels | Kivio",
-      },
-    ],
+    title: loaderData?.details?.title 
+      ? `${loaderData.details.title} | Kivio` 
+      : "Channels | Kivio",
+    meta: [],
   }),
   component: RouteComponent,
 });

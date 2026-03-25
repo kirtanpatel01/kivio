@@ -10,7 +10,8 @@ export const Route = createFileRoute("/history")({
     return { initialHistory: history || [] };
   },
   head: () => ({
-    meta: [{ title: 'History | Kivio' }]
+    title: 'History | Kivio',
+    meta: []
   }),
   component: RouteComponent,
 });

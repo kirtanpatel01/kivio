@@ -27,12 +27,10 @@ export const Route = createFileRoute("/videos/$videoId")({
     };
   },
   head: ({ loaderData }) => ({
+    title: loaderData?.video?.title 
+      ? `${loaderData.video.title} | Kivio` 
+      : "Video | Kivio",
     meta: [
-      {
-        title: loaderData?.video?.title 
-          ? `${loaderData.video.title} | Kivio` 
-          : "Video | Kivio",
-      },
       {
         name: "description",
         content: loaderData?.video?.description?.slice(0, 160) || "Watch this video on Kivio.",
