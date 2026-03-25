@@ -34,7 +34,7 @@ The goal was to build a tool that:
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/yourusername/kivio.git
+   git clone https://github.com/kirtanpatel01/kivio.git
    cd kivio
    ```
 
@@ -53,6 +53,16 @@ The goal was to build a tool that:
    ```bash
    npm run dev
    ```
+
+## Deployment
+
+Kivio is **currently deployed on Vercel** and uses **Nitro** as the server engine. 
+
+To ensure stability and consistent routing, we **highly recommend** that you also deploy to Vercel. Using other platforms may require manual Nitro adapter configuration and may lead to SSR issues. To deploy successfully:
+
+1.  **Framework Preset**: Select "TanStack Start" (or "Other" with Nitro detection) in your Vercel project settings.
+2.  **Environment Variables**: Ensure you've set all the keys mentioned in the `.env` section below in your Vercel Dashboard.
+3.  **Auth URL**: Set `BETTER_AUTH_URL` to your production domain.
 
 ## .env Example
 
@@ -76,4 +86,4 @@ GOOGLE_CLIENT_SECRET=your_google_client_secret
 
 ---
 
-*Build your own feed. Watch what you want. [Kivio](https://github.com/yourusername/kivio).*
+*Build your own feed. Watch what you want.*
