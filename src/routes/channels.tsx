@@ -5,6 +5,7 @@ import { IconLoader } from "@tabler/icons-react";
 import { authClient } from "#/lib/auth-client";
 import { getUserChannels } from "#/actions/channels";
 import { fetchChannelByHandle } from "#/actions/youtube";
+import UnauthorizedState from "#/components/UnauthorizedState";
 
 interface ChannelSearch {
   handle?: string;
@@ -36,6 +37,17 @@ export const Route = createFileRoute("/channels")({
 });
 
 function ErrorState({ error, reset }: { error: any; reset: () => void }) {
+  const isUnauthorized = error?.message === "Unauthorized" || error?.status === 401;
+  
+  if (isUnauthorized) {
+    return (
+      <UnauthorizedState 
+        title="Manage Channels"
+        description="Sign in to Kivio to manage your personalized list of YouTube channels and sync them across devices."
+      />
+    );
+  }
+
   return (
     <div className="h-[calc(100vh-3rem)] flex flex-col items-center justify-center p-6 text-center space-y-4">
       <div className="size-16 bg-rose-500/10 rounded-2xl flex items-center justify-center text-rose-500 mb-2">
@@ -71,13 +83,10 @@ function RouteComponent() {
 
   if (!session) {
     return (
-      <div className="h-[calc(100vh-3rem)] flex flex-col items-center justify-center p-4 text-center space-y-4">
-        <h2 className="text-2xl font-bold">Sign in to save channels</h2>
-        <p className="text-muted-foreground max-w-md">
-          You need to be logged in to manage your personalized list of YouTube
-          channels and sync them across devices.
-        </p>
-      </div>
+      <UnauthorizedState 
+        title="Sign in to save channels"
+        description="You need to be logged in to manage your personalized list of YouTube channels and sync them across devices."
+      />
     );
   }
 
@@ -90,4 +99,3 @@ function RouteComponent() {
     </div>
   );
 }
-

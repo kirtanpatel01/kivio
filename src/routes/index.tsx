@@ -5,17 +5,25 @@ import { getWatchedVideoIds } from '#/actions/history'
 import type { YouTubeVideo } from '#/types'
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { IconLoader } from '@tabler/icons-react'
+import UnauthorizedState from '#/components/UnauthorizedState'
 
 export const Route = createFileRoute('/')({
   loader: async () => {
-    const [feed, watchedIds] = await Promise.all([
-      fetchFeedForUser(),
-      getWatchedVideoIds()
-    ])
-    return { 
-      videos: feed?.videos || [], 
-      nextPageTokens: feed?.nextPageTokens || {},
-      watchedIds: watchedIds || []
+    try {
+      const [feed, watchedIds] = await Promise.all([
+        fetchFeedForUser(),
+        getWatchedVideoIds()
+      ])
+      return { 
+        videos: feed?.videos || [], 
+        nextPageTokens: feed?.nextPageTokens || {},
+        watchedIds: watchedIds || []
+      }
+    } catch (e: any) {
+      if (e.message === "Unauthorized") {
+        throw e; // Let the errorComponent handle it specifically
+      }
+      throw e;
     }
   },
   head: () => ({
@@ -27,6 +35,17 @@ export const Route = createFileRoute('/')({
 })
 
 function ErrorState({ error, reset }: { error: any; reset: () => void }) {
+  const isUnauthorized = error?.message === "Unauthorized" || error?.status === 401;
+
+  if (isUnauthorized) {
+    return (
+      <UnauthorizedState 
+        title="Your Personal Feed"
+        description="Sign in to Kivio to manage your favorite channels, track your watch history, and see a personalized video feed."
+      />
+    );
+  }
+
   return (
     <div className="h-[70vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
       <div className="size-16 bg-rose-500/10 rounded-2xl flex items-center justify-center text-rose-500 mb-2">
@@ -76,7 +95,7 @@ function Dashboard() {
   }, [videos, selectedChannelIds]);
 
   const toggleChannel = (id: string) => {
-    setSelectedChannelIds((prev) =>
+    setSelectedChannelIds((prev: string[]) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     )
   }
@@ -88,7 +107,7 @@ function Dashboard() {
     try {
       const result = await fetchFeedForUser({ data: nextPageTokens })
       if (result && result.videos.length > 0) {
-        setVideos((prev) => [...prev, ...result.videos])
+        setVideos((prev: any[]) => [...prev, ...result.videos])
         setNextPageTokens(result.nextPageTokens)
       } else {
         setNextPageTokens({})
@@ -166,7 +185,7 @@ function Dashboard() {
             All Channels
           </button>
 
-          {uniqueChannels.map((channel) => (
+          {uniqueChannels.map((channel: any) => (
             <button
               key={channel.id}
               onClick={() => toggleChannel(channel.id)}
@@ -196,7 +215,7 @@ function Dashboard() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {filteredVideos.map((video) => (
+            {filteredVideos.map((video: any) => (
               <Link
                 to={`/videos/$videoId`}
                 params={{ videoId: video.id }}
