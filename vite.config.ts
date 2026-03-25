@@ -17,6 +17,9 @@ const config = defineConfig({
     viteReact(),
     nitro(),
   ],
+  environments: {
+    ssr: { build: { rollupOptions: { input: "./server.ts" } } },
+  },
 })
 
 export default config
