@@ -23,7 +23,30 @@ export const Route = createFileRoute('/')({
     meta: []
   }),
   component: Dashboard,
+  errorComponent: ErrorState,
 })
+
+function ErrorState({ error, reset }: { error: any; reset: () => void }) {
+  return (
+    <div className="h-[70vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
+      <div className="size-16 bg-rose-500/10 rounded-2xl flex items-center justify-center text-rose-500 mb-2">
+         <span className="text-2xl font-bold">!</span>
+      </div>
+      <div className="space-y-1">
+        <h2 className="text-xl font-bold">Failed to load feed</h2>
+        <p className="text-muted-foreground text-sm max-w-xs mx-auto">
+          {error?.message || "Verify your internet connection and try again."}
+        </p>
+      </div>
+      <button
+        onClick={() => reset()}
+        className="px-8 py-2 bg-primary text-primary-foreground rounded-full font-semibold hover:opacity-90 cursor-pointer"
+      >
+        Try Again
+      </button>
+    </div>
+  );
+}
 
 function Dashboard() {
   const { videos: initialVideos, nextPageTokens: initialTokens, watchedIds } = Route.useLoaderData()

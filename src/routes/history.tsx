@@ -14,7 +14,30 @@ export const Route = createFileRoute("/history")({
     meta: []
   }),
   component: RouteComponent,
+  errorComponent: ErrorState,
 });
+
+function ErrorState({ error, reset }: { error: any; reset: () => void }) {
+  return (
+    <div className="h-[calc(100vh-3rem)] flex flex-col items-center justify-center p-6 text-center space-y-4">
+      <div className="size-16 bg-rose-500/10 rounded-2xl flex items-center justify-center text-rose-500 mb-2">
+         <span className="text-4xl font-black">!</span>
+      </div>
+      <div className="space-y-1">
+        <h2 className="text-xl font-bold italic tracking-tight uppercase">History Error</h2>
+        <p className="text-muted-foreground text-sm max-w-xs mx-auto">
+          {error?.message || "There was an error retrieving your history. Check your connection and try again."}
+        </p>
+      </div>
+      <button
+        onClick={() => reset()}
+        className="px-10 py-2.5 bg-black dark:bg-white text-white dark:text-black rounded-lg font-black uppercase tracking-widest text-xs hover:scale-105 active:scale-95 shadow-xl transition-all"
+      >
+        Try Again
+      </button>
+    </div>
+  );
+}
 
 function RouteComponent() {
   const { initialHistory } = Route.useLoaderData();
