@@ -1,4 +1,4 @@
-import { fetchVideoDetails, fetchVideosByPlaylistId } from "#/actions/youtube";
+import { fetchVideoDetails, getSuggestedVideos } from "#/actions/youtube";
 import { recordHistory, getWatchedVideoIds } from "#/actions/history";
 import type { YouTubeVideo } from "#/types";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -15,14 +15,14 @@ export const Route = createFileRoute("/videos/$videoId")({
     
     if (!video) return { video: null, suggestions: [], watchedIds: watchedIds || [] };
 
-    // Fetch some suggestions from the same channel
-    const suggestionData = video.uploadsPlaylistId 
-      ? await fetchVideosByPlaylistId({ data: { playlistId: video.uploadsPlaylistId } })
-      : null;
+    // Fetch suggestions from our local database instead of YouTube API
+    const suggestions = video.channelId 
+      ? await getSuggestedVideos({ data: { channelId: video.channelId } })
+      : [];
 
     return { 
       video, 
-      suggestions: suggestionData?.videos || [],
+      suggestions: suggestions || [],
       watchedIds: watchedIds || []
     };
   },

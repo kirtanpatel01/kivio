@@ -1,33 +1,29 @@
-
 import { createServerFn } from "@tanstack/react-start";
-import { eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { db } from "#/db";
-import { channels, youtubeChannels } from "#/db/schema";
+import { channels, videos, youtubeChannels } from "#/db/schema";
 import { type YouTubeChannelDetails, type YouTubeVideo } from "#/types";
 import { ensureSession } from "#/lib/auth.functions";
 import { parseISO8601Duration } from "#/lib/utils";
 import { getEnvVar } from "#/lib/server-utils";
+import { syncChannelVideosExhaustive } from "./sync";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 export const fetchChannelByHandle = createServerFn({ method: "GET" })
   .inputValidator((handle: string) => handle)
   .handler(async ({ data: handle }) => {
-    if (!handle || handle.trim() === "" || handle.trim() === "@") {
-      return null;
-    }
+    if (!handle || handle.trim() === "" || handle.trim() === "@") return null;
 
-    const cleanHandle = (
-      handle.startsWith("@") ? handle : `@${handle}`
-    ).toLowerCase();
+    const cleanHandle = (handle.startsWith("@") ? handle : `@${handle}`).toLowerCase();
 
-    // 1. Check database cache first
+    // 1. Check database cache
     const cached = await db.query.youtubeChannels.findFirst({
       where: eq(youtubeChannels.handle, cleanHandle),
     });
 
     if (cached && Date.now() - cached.fetchedAt.getTime() < CACHE_TTL_MS) {
-      const result: YouTubeChannelDetails = {
+      return {
         id: cached.channelId,
         title: cached.title,
         description: cached.description,
@@ -45,44 +41,23 @@ export const fetchChannelByHandle = createServerFn({ method: "GET" })
           videoCount: cached.videoCount,
         },
         uploadsPlaylistId: cached.uploadsPlaylistId,
-      };
-      return result;
+      } as YouTubeChannelDetails;
     }
 
-    // 2. Cache miss or expired — fetch from YouTube API
+    // 2. Cache miss — Fetch from YouTube API
     const apiKey = getEnvVar("YOUTUBE_API_KEY")?.trim();
-    if (!apiKey) {
-      console.error("[YouTube API] YOUTUBE_API_KEY is missing or empty");
-      throw new Error("YouTube API Key is not configured.");
-    }
+    if (!apiKey) throw new Error("YouTube API Key not configured.");
 
     const url = `https://www.googleapis.com/youtube/v3/channels?forHandle=${encodeURIComponent(cleanHandle)}&part=snippet,statistics,contentDetails&key=${apiKey}`;
 
     try {
       const res = await fetch(url);
-
-      if (!res.ok) {
-        const body = await res.text();
-        console.error(
-          `[YouTube API] Request failed with status ${res.status}:`,
-          body,
-        );
-
-        if (res.status === 400) {
-          // If the handle is invalid or not found, return null to show empty state/clean error
-          return null;
-        }
-        throw new Error(`YouTube API error (${res.status}): ${body}`);
-      }
+      if (!res.ok) return null;
 
       const data = await res.json();
-
-      if (!data.items || data.items.length === 0) {
-        return null;
-      }
+      if (!data.items || data.items.length === 0) return null;
 
       const item = data.items[0];
-
       const result: YouTubeChannelDetails = {
         id: item.id,
         title: item.snippet.title,
@@ -99,7 +74,7 @@ export const fetchChannelByHandle = createServerFn({ method: "GET" })
         uploadsPlaylistId: item.contentDetails.relatedPlaylists.uploads,
       };
 
-      // 3. Upsert into database cache
+      // 3. Upsert channel cache
       const row = {
         handle: cleanHandle,
         channelId: result.id,
@@ -118,187 +93,108 @@ export const fetchChannelByHandle = createServerFn({ method: "GET" })
         fetchedAt: new Date(),
       };
 
-      await db
-        .insert(youtubeChannels)
-        .values(row)
-        .onConflictDoUpdate({
-          target: youtubeChannels.handle,
-          set: { ...row, handle: undefined },
-        });
+      await db.insert(youtubeChannels).values(row).onConflictDoUpdate({
+        target: youtubeChannels.handle,
+        set: { ...row, handle: undefined },
+      });
+
+      // 4. Trigger EXHAUSTIVE Sync in background
+      syncChannelVideosExhaustive({ data: { channelId: result.id, uploadsPlaylistId: result.uploadsPlaylistId } })
+        .catch(err => console.error(`[InitialSync] Failed for ${result.id}:`, err));
 
       return result;
     } catch (e: unknown) {
-      console.error("[YouTube API] Unexpected error:", e);
+      console.error("[YouTube API] Error:", e);
       throw e;
     }
   });
 
-export const fetchVideosByPlaylistId = createServerFn({ method: "GET" })
-  .inputValidator((data: { playlistId: string; pageToken?: string }) => data)
-  .handler(async ({ data }): Promise<{ videos: YouTubeVideo[]; nextPageToken: string | null } | null> => {
-    const { playlistId, pageToken } = data;
-    const apiKey = getEnvVar("YOUTUBE_API_KEY")?.trim();
-    if (!apiKey) {
-      console.error("[YouTube API] YOUTUBE_API_KEY is missing or empty");
-      throw new Error("YouTube API Key is not configured.");
-    }
-
-    let url = `https://www.googleapis.com/youtube/v3/playlistItems?playlistId=${encodeURIComponent(playlistId)}&part=snippet,contentDetails&key=${apiKey}&maxResults=10`;
-    if (pageToken) {
-      url += `&pageToken=${encodeURIComponent(pageToken)}`;
-    }
-
-    try {
-      const res = await fetch(url);
-
-      if (!res.ok) {
-        const body = await res.text();
-        console.error(
-          `[YouTube API] Request failed with status ${res.status}:`,
-          body,
-        );
-
-        if (res.status === 400) {
-          // If the playlistId is invalid or not found, return null to show empty state/clean error
-          return null;
-        }
-        throw new Error(`YouTube API error (${res.status}): ${body}`);
-      }
-
-      const data = await res.json();
-
-      if (!data.items || data.items.length === 0) {
-        return { videos: [], nextPageToken: null };
-      }
-
-      // Fetch durations in batch
-      const videoIds = data.items.map((item: { contentDetails: { videoId: string } }) => item.contentDetails.videoId).join(",");
-      const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?id=${videoIds}&part=contentDetails&key=${apiKey}`;
-      const detailsRes = await fetch(detailsUrl);
-      const detailsData = await detailsRes.json();
-      const durationMap = new Map<string, string>(
-        detailsData.items.map((v: { id: string; contentDetails: { duration: string } }) => [v.id, v.contentDetails.duration])
-      );
-
-      const videos = data.items.map((item: { 
-        contentDetails: { videoId: string }; 
-        snippet: { 
-          title: string; 
-          thumbnails: { high?: { url: string }; default?: { url: string } };
-          publishedAt: string;
-          channelTitle: string;
-          channelId: string;
-        } 
-      }) => {
-        const videoId = item.contentDetails.videoId;
-        const duration = durationMap.get(videoId);
-        return {
-          id: videoId,
-          title: item.snippet.title,
-          thumbnail:
-            item.snippet.thumbnails?.high?.url ||
-            item.snippet.thumbnails?.default?.url || "",
-          publishedAt: item.snippet.publishedAt,
-          channelTitle: item.snippet.channelTitle,
-          channelId: item.snippet.channelId,
-          duration: duration ? parseISO8601Duration(duration) : null,
-        }
-      });
-
-      return { videos, nextPageToken: data.nextPageToken || null };
-    } catch (e: unknown) {
-      console.error("[YouTube API] Unexpected error:", e);
-      throw e;
-    }
-  });
-
-export const fetchFeedForUser = createServerFn({
-  method: "GET",
-})
-  .inputValidator((tokens?: Record<string, string>) => tokens)
-  .handler(async ({ data: tokens }) => {
-    const session = await ensureSession();
-    const userId = session.user.id;
-    if (!userId) throw new Error("Unauthorized");
-
-    const userChannels = await db.query.channels.findMany({
-      where: eq(channels.userId, userId),
+export const getSuggestedVideos = createServerFn({ method: "GET" })
+  .inputValidator((data: { channelId: string }) => data)
+  .handler(async ({ data }) => {
+    const { channelId } = data;
+    
+    const result = await db.query.videos.findMany({
+      where: eq(videos.channelId, channelId),
       with: {
         youtubeChannel: true,
       },
+      orderBy: [desc(videos.publishedAt)],
+      limit: 12,
     });
 
-    if (userChannels.length === 0) return { videos: [], nextPageTokens: {} };
+    return result.map((v) => ({
+      id: v.id,
+      title: v.title,
+      thumbnail: v.thumbnail,
+      publishedAt: v.publishedAt.toISOString(),
+      duration: v.duration,
+      channelId: v.channelId,
+      channelTitle: v.youtubeChannel?.title ?? "",
+      channelAvatar: v.youtubeChannel?.thumbnailMedium ?? "",
+    }));
+  });
 
-    const allResultsPromises = userChannels.map(async (uc) => {
-      const playlistId = uc.youtubeChannel?.uploadsPlaylistId;
-      if (!playlistId) return { videos: [], nextPageToken: null, channelId: uc.handle };
+export const fetchFeedForUser = createServerFn({ method: "GET" })
+  .inputValidator((data?: { page?: number; limit?: number }) => data)
+  .handler(async ({ data }) => {
+    const session = await ensureSession();
+    const userId = session.user.id;
+    const page = data?.page ?? 0;
+    const limit = data?.limit ?? 20;
 
-      const pageToken = tokens?.[playlistId];
-      
-      // Fetch the videos
-      const result = await fetchVideosByPlaylistId({ data: { playlistId, pageToken } });
-      
-      if (!result || !result.videos) return { videos: [], nextPageToken: null, playlistId };
-      
-      const videosWithAvatar = result.videos.map((v) => ({
-        ...v,
-        channelAvatar: uc.youtubeChannel?.thumbnailMedium ?? ""
-      }));
+    const userChannels = await db.query.channels.findMany({
+      where: eq(channels.userId, userId),
+      with: { youtubeChannel: true },
+    });
 
-      return { 
-        videos: videosWithAvatar, 
-        nextPageToken: result.nextPageToken,
-        playlistId 
+    if (userChannels.length === 0) return { videos: [], hasMore: false };
+
+    const channelIds = userChannels.map(uc => uc.youtubeChannel?.channelId).filter(Boolean) as string[];
+
+    const result = await db.query.videos.findMany({
+      where: inArray(videos.channelId, channelIds),
+      orderBy: [desc(videos.publishedAt)],
+      limit: limit + 1,
+      offset: page * limit,
+    });
+
+    const hasMore = result.length > limit;
+    const feedVideos = result.slice(0, limit).map((v) => {
+      const channel = userChannels.find((uc) => uc.youtubeChannel?.channelId === v.channelId);
+      return {
+        id: v.id,
+        title: v.title,
+        thumbnail: v.thumbnail,
+        publishedAt: v.publishedAt.toISOString(),
+        duration: v.duration,
+        channelId: v.channelId,
+        channelTitle: channel?.youtubeChannel?.title ?? "",
+        channelAvatar: channel?.youtubeChannel?.thumbnailMedium ?? "",
       };
     });
 
-    const resultsByChannel = await Promise.all(allResultsPromises);
-
-    const allVideos = resultsByChannel
-      .map(r => r.videos)
-      .flat()
-      .sort((a, b) => {
-        return (
-          new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
-        );
-      });
-
-    const nextPageTokens: Record<string, string> = {};
-    resultsByChannel.forEach(r => {
-      if (r.playlistId && r.nextPageToken) {
-        nextPageTokens[r.playlistId] = r.nextPageToken;
-      }
-    });
-
-    return { videos: allVideos, nextPageTokens };
+    return { videos: feedVideos, hasMore };
   });
 
 export const fetchVideoDetails = createServerFn({ method: "GET" })
   .inputValidator((videoId: string) => videoId)
   .handler(async ({ data: videoId }): Promise<YouTubeVideo | null> => {
     const apiKey = getEnvVar("YOUTUBE_API_KEY")?.trim();
-    if (!apiKey) {
-      console.error("[YouTube API] YOUTUBE_API_KEY is missing or empty");
-      throw new Error("YouTube API Key is not configured.");
-    }
+    if (!apiKey) throw new Error("YouTube API Key not configured.");
 
     const url = `https://www.googleapis.com/youtube/v3/videos?id=${encodeURIComponent(videoId)}&part=snippet,statistics,contentDetails&key=${apiKey}`;
 
     try {
       const res = await fetch(url);
-      if (!res.ok) {
-        const body = await res.text();
-        throw new Error(`YouTube API error (${res.status}): ${body}`);
-      }
-
+      if (!res.ok) return null;
       const data = await res.json();
       if (!data.items || data.items.length === 0) return null;
 
       const item = data.items[0];
-
-      // Fetch channel details for avatar and sub count
       const channelId = item.snippet.channelId;
+
+      // Get channel details for avatar
       const channelUrl = `https://www.googleapis.com/youtube/v3/channels?id=${channelId}&part=snippet,statistics,contentDetails&key=${apiKey}`;
       const channelRes = await fetch(channelUrl);
       const channelData = await channelRes.json();
@@ -307,7 +203,7 @@ export const fetchVideoDetails = createServerFn({ method: "GET" })
       return {
         id: item.id,
         title: item.snippet.title,
-        thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.default?.url || "",
+        thumbnail: (item.snippet.thumbnails.high || item.snippet.thumbnails.default).url,
         description: item.snippet.description,
         publishedAt: item.snippet.publishedAt,
         viewCount: item.statistics.viewCount,

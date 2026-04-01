@@ -90,7 +90,7 @@ export const youtubeChannels = pgTable("youtube_channels", {
   handle: text("handle").primaryKey(), // lowercase, e.g. "@mkbhd"
 
   // Channel info
-  channelId: text("channel_id").notNull(),
+  channelId: text("channel_id").notNull().unique(),
   title: text("title").notNull(),
   description: text("description").notNull(),
   customUrl: text("custom_url").notNull(),
@@ -108,11 +108,48 @@ export const youtubeChannels = pgTable("youtube_channels", {
   videoCount: text("video_count").notNull(),
   uploadsPlaylistId: text("uploads_playlist_id").notNull(),
 
+  // Webhook Subscription Metadata
+  subscriptionLeaseExpiresAt: timestamp("subscription_lease_expires_at", { withTimezone: true }),
+  subscriptionSecret: text("subscription_secret"),
+
   // Cache metadata
   fetchedAt: timestamp("fetched_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
 });
+
+export const videos = pgTable("videos", {
+  id: text("id").primaryKey(), // YouTube Video ID
+  channelId: text("channel_id")
+    .notNull()
+    .references(() => youtubeChannels.channelId, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  thumbnail: text("thumbnail").notNull(),
+  description: text("description"),
+  publishedAt: timestamp("published_at", { withTimezone: true }).notNull(),
+  duration: text("duration"), // YouTube ISO 8601 duration
+  viewCount: text("view_count"),
+  likeCount: text("like_count"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("videos_channelId_idx").on(table.channelId),
+  index("videos_publishedAt_idx").on(table.publishedAt),
+]);
+
+export const notifications = pgTable("notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  videoId: text("video_id")
+    .notNull()
+    .references(() => videos.id, { onDelete: "cascade" }),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("notifications_userId_idx").on(table.userId),
+  index("notifications_userId_isRead_idx").on(table.userId, table.isRead),
+]);
 
 export const history = pgTable("history", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -135,6 +172,7 @@ export const userRelations = relations(user, ({ many }) => ({
   accounts: many(account),
   channels: many(channels),
   history: many(history),
+  notifications: many(notifications),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -162,9 +200,33 @@ export const channelRelations = relations(channels, ({ one }) => ({
   }),
 }));
 
+export const videosRelations = relations(videos, ({ one, many }) => ({
+  youtubeChannel: one(youtubeChannels, {
+    fields: [videos.channelId],
+    references: [youtubeChannels.channelId],
+  }),
+  notifications: many(notifications),
+  history: many(history),
+}));
+
+export const notificationRelations = relations(notifications, ({ one }) => ({
+  user: one(user, {
+    fields: [notifications.userId],
+    references: [user.id],
+  }),
+  video: one(videos, {
+    fields: [notifications.videoId],
+    references: [videos.id],
+  }),
+}));
+
 export const historyRelations = relations(history, ({ one }) => ({
   user: one(user, {
     fields: [history.userId],
     references: [user.id],
+  }),
+  video: one(videos, {
+    fields: [history.videoId],
+    references: [videos.id],
   }),
 }));

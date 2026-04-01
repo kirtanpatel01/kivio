@@ -1,6 +1,7 @@
 import VideoCard from '#/components/video-card'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { fetchFeedForUser } from '#/actions/youtube'
+import { syncAllSubscribedChannels } from '#/actions/sync'
 import { getWatchedVideoIds } from '#/actions/history'
 import type { YouTubeVideo } from '#/types'
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
@@ -16,12 +17,12 @@ export const Route = createFileRoute('/')({
       ])
       return { 
         videos: feed?.videos || [], 
-        nextPageTokens: feed?.nextPageTokens || {},
+        hasMore: feed?.hasMore || false,
         watchedIds: watchedIds || []
       }
     } catch (e: any) {
       if (e.message === "Unauthorized") {
-        throw e; // Let the errorComponent handle it specifically
+        throw e;
       }
       throw e;
     }
@@ -68,10 +69,12 @@ function ErrorState({ error, reset }: { error: any; reset: () => void }) {
 }
 
 function Dashboard() {
-  const { videos: initialVideos, nextPageTokens: initialTokens, watchedIds } = Route.useLoaderData()
+  const { videos: initialVideos, hasMore: initialHasMore, watchedIds } = Route.useLoaderData()
   const [videos, setVideos] = useState(initialVideos)
-  const [nextPageTokens, setNextPageTokens] = useState(initialTokens)
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(initialHasMore)
   const [isFetchingMore, setIsFetchingMore] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
   const observerTarget = useRef<HTMLDivElement>(null)
   const [selectedChannelIds, setSelectedChannelIds] = useState<string[]>([])
 
@@ -101,23 +104,25 @@ function Dashboard() {
   }
 
   const loadMore = useCallback(async () => {
-    if (isFetchingMore || Object.keys(nextPageTokens).length === 0) return
+    if (isFetchingMore || !hasMore) return
 
     setIsFetchingMore(true)
     try {
-      const result = await fetchFeedForUser({ data: nextPageTokens })
+      const nextPage = page + 1
+      const result = await fetchFeedForUser({ data: { page: nextPage } })
       if (result && result.videos.length > 0) {
         setVideos((prev: any[]) => [...prev, ...result.videos])
-        setNextPageTokens(result.nextPageTokens)
+        setPage(nextPage)
+        setHasMore(result.hasMore)
       } else {
-        setNextPageTokens({})
+        setHasMore(false)
       }
     } catch (err) {
       console.error("[Dashboard] Error loading more videos:", err)
     } finally {
       setIsFetchingMore(false)
     }
-  }, [nextPageTokens, isFetchingMore])
+  }, [page, hasMore, isFetchingMore])
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -134,23 +139,52 @@ function Dashboard() {
       observer.observe(observerTarget.current)
     }
 
-    return () => observer.disconnect()
+    return () => observer.disconnect();
   }, [loadMore])
 
   if (!videos || videos.length === 0) {
     return (
-      <div className="h-[80vh] flex flex-col items-center justify-center text-center gap-4">
-        <img src="/logo.png" alt="Kivio" className="size-24 opacity-20 p-4 bg-black dark:bg-white rounded-4xl mb-2" />
-        <h2 className="text-2xl font-bold">Your feed is empty</h2>
-        <p className="text-muted-foreground">
-          Add some YouTube handles in the Channels page to see videos here.
-        </p>
-        <Link
-          to="/channels"
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90"
-        >
-          Go to Channels
-        </Link>
+      <div className="h-[80vh] flex flex-col items-center justify-center text-center gap-4 px-6">
+        <div className="relative group">
+          <img src="/logo.png" alt="Kivio" className="size-24 opacity-20 p-4 bg-black dark:bg-white rounded-4xl mb-2 group-hover:opacity-30 transition-opacity" />
+          {isSyncing && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <IconLoader className="animate-spin text-primary size-8" />
+            </div>
+          )}
+        </div>
+        
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold">Your feed is currently empty</h2>
+          <p className="text-muted-foreground max-w-sm mx-auto">
+            We haven't indexed any videos for your followed channels yet, or you haven't followed any channels.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 mt-4">
+          <button
+            onClick={async () => {
+              setIsSyncing(true)
+              try {
+                await syncAllSubscribedChannels()
+                window.location.reload() // Quickest way to refresh loader data
+              } finally {
+                setIsSyncing(false)
+              }
+            }}
+            disabled={isSyncing}
+            className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold hover:scale-105 active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-2"
+          >
+            {isSyncing ? "Syncing..." : "Sync All Channels"}
+          </button>
+          
+          <Link
+            to="/channels"
+            className="px-6 py-2.5 bg-secondary text-secondary-foreground rounded-xl font-bold hover:bg-secondary/80 transition-all border border-border/50"
+          >
+            Manage Channels
+          </Link>
+        </div>
       </div>
     )
   }
@@ -235,7 +269,7 @@ function Dashboard() {
         <div 
           ref={observerTarget} 
           className="w-full py-12 flex items-center justify-center"
-          style={{ opacity: Object.keys(nextPageTokens).length > 0 ? 1 : 0 }}
+          style={{ opacity: hasMore ? 1 : 0 }}
         >
           {isFetchingMore && (
              <div className="flex items-center gap-3 text-muted-foreground animate-in fade-in slide-in-from-bottom-2">
