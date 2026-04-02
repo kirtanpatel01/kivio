@@ -1,38 +1,55 @@
 import { IconLoader } from "@tabler/icons-react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { z } from "zod";
 import { getUserChannels, getVideosForChannelHandle } from "#/actions/channels";
 import { getWatchedVideoIds } from "#/actions/history";
 import { fetchChannelByHandle } from "#/actions/channel";
+import { fetchPlaylistsByHandle } from "#/actions/playlists";
 import ChannelDetails from "#/components/channels/channel-details";
 import ChannelList from "#/components/channels/channel-list";
 import UnauthorizedState from "#/components/UnauthorizedState";
 import { authClient } from "#/lib/auth-client";
 
-interface ChannelSearch {
-	handle?: string;
-}
 
 export const Route = createFileRoute("/channels")({
-	validateSearch: (search: Record<string, unknown>): ChannelSearch => {
-		return {
-			handle: (search.handle as string) || undefined,
-		};
-	},
-	loaderDeps: ({ search: { handle } }) => ({ handle }),
-	loader: async ({ deps: { handle } }) => {
+	validateSearch: (search) =>
+		z
+			.object({
+				handle: z.string().optional(),
+				tab: z.enum(["videos", "shorts", "playlists"])
+					.optional()
+					.default("videos"),
+			})
+			.parse(search),
+	loaderDeps: ({ search: { handle, tab } }) => ({ handle, tab }),
+	loader: async ({ deps: { handle, tab } }) => {
 		const channels = await getUserChannels();
-		if (!handle) {
-			return { channels, details: null, channelVideos: [], watchedIds: [] };
+
+		if (!handle && channels.length > 0) {
+			throw redirect({
+				to: "/channels",
+				search: {
+					handle: channels[0]!.handle,
+					tab,
+				},
+				replace: true,
+			});
 		}
-		const [details, channelVideos, watchedIds] = await Promise.all([
+
+		if (!handle) {
+			return { channels, details: null, channelVideos: [], playlists: [], watchedIds: [] };
+		}
+		const [details, channelVideos, playlists, watchedIds] = await Promise.all([
 			fetchChannelByHandle({ data: handle }),
 			getVideosForChannelHandle({ data: handle }),
+			fetchPlaylistsByHandle({ data: handle }),
 			getWatchedVideoIds(),
 		]);
 		return {
 			channels,
 			details,
 			channelVideos,
+			playlists: playlists ?? [],
 			watchedIds: watchedIds ?? [],
 		};
 	},

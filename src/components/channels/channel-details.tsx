@@ -1,31 +1,33 @@
 import {
 	IconBrandYoutube,
 	IconEye,
+	IconInfoCircle,
 	IconUsers,
 	IconVideo,
 } from "@tabler/icons-react";
-import { getRouteApi, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import VideoCard from "#/components/video-card";
-import type { videos as videosSchema } from "#/db/schema";
-import { formatCount, formatDate, parseISO8601Duration } from "#/lib/utils";
-import type { YouTubeChannelDetails, YouTubeVideo } from "#/types";
-
-import { mapDbVideoToYouTubeVideo } from "#/actions/videos";
-
-type VideoRow = typeof videosSchema.$inferSelect;
+import { formatCount, formatDate } from "#/lib/utils";
+import type { YouTubeChannelDetails, YouTubePlaylist, YouTubeVideo } from "#/types";
 
 const routeApi = getRouteApi("/channels");
 
 export default function ChannelDetails() {
-	const { handle } = routeApi.useSearch();
-	const { details, channelVideos, watchedIds } =
+	const { handle, tab } = routeApi.useSearch();
+	const navigate = useNavigate({ from: "/channels" });
+	const { details, channelVideos, playlists, watchedIds } =
 		routeApi.useLoaderData() as {
 			details: YouTubeChannelDetails | null;
 			channelVideos: YouTubeVideo[];
+			playlists: YouTubePlaylist[];
 			watchedIds: string[];
 		};
-	const [tab, setTab] = useState<"videos" | "shorts">("videos");
+
+	const setTab = (newTab: "videos" | "shorts" | "playlists") => {
+		navigate({
+			search: { handle, tab: newTab },
+		});
+	};
 
 	if (!handle) {
 		return (
@@ -121,9 +123,21 @@ export default function ChannelDetails() {
 			<section className="flex-1 px-4 py-6 sm:px-6">
 				<div className="max-w-[1600px] mx-auto">
 					<div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-						<h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">
-							{tab === "shorts" ? "Shorts in Kivio" : "Videos in Kivio"}
-						</h2>
+						<div className="flex flex-col gap-1">
+							<h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">
+								{tab === "shorts" 
+									? "Shorts in Kivio" 
+									: tab === "playlists"
+									? "Playlists in Kivio"
+									: "Videos in Kivio"}
+							</h2>
+							{tab === "playlists" && playlists.length > 0 && (
+								<div className="flex items-center gap-1.5 text-[10px] text-primary/70 font-medium">
+									<IconInfoCircle size={12} />
+									<span>Video counts are cached for 24h</span>
+								</div>
+							)}
+						</div>
 
 						<div className="flex rounded-xl border border-border/60 bg-secondary/10 p-1 gap-1">
 							<button
@@ -148,9 +162,57 @@ export default function ChannelDetails() {
 							>
 								Shorts
 							</button>
+							<button
+								type="button"
+								onClick={() => setTab("playlists")}
+								className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+									tab === "playlists"
+										? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+										: "text-foreground/70 hover:bg-secondary/60"
+								}`}
+							>
+								Playlists
+							</button>
 						</div>
 					</div>
-					{filteredVideos.length === 0 ? (
+					{tab === "playlists" ? (
+						playlists.length === 0 ? (
+							<div className="rounded-xl border border-dashed border-border/60 bg-secondary/10 py-16 text-center px-4">
+								<p className="text-sm font-medium text-foreground/80">No playlists found</p>
+							</div>
+						) : (
+							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+								{playlists.map((playlist) => (
+									<Link
+										key={playlist.id}
+										to="/playlists/$playlistId"
+										params={{ playlistId: playlist.id }}
+										className="w-full group cursor-pointer flex flex-col gap-3 hover:scale-[1.01] transition-transform duration-300"
+									>
+										<div className="relative w-full aspect-video overflow-hidden rounded-2xl bg-secondary/20">
+											<img
+												src={playlist.thumbnail}
+												alt={playlist.title}
+												className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+											/>
+											<div className="absolute inset-y-0 right-0 w-1/3 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center text-white border-l border-white/10">
+												<span className="text-lg font-bold">{playlist.itemCount}</span>
+												<span className="text-[10px] uppercase tracking-widest font-medium opacity-70">Videos</span>
+											</div>
+										</div>
+										<div className="px-1">
+											<h3 className="text-sm sm:text-base font-bold line-clamp-2 leading-tight">
+												{playlist.title}
+											</h3>
+											<p className="text-[10px] sm:text-xs text-foreground/40 font-medium mt-1">
+												Created on {formatDate(playlist.publishedAt)}
+											</p>
+										</div>
+									</Link>
+								))}
+							</div>
+						)
+					) : filteredVideos.length === 0 ? (
 						<div className="rounded-xl border border-dashed border-border/60 bg-secondary/10 py-16 text-center px-4">
 							<p className="text-sm font-medium text-foreground/80">
 								No videos stored yet

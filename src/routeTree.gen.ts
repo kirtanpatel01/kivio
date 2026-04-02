@@ -14,6 +14,7 @@ import { Route as HistoryRouteImport } from './routes/history'
 import { Route as ChannelsRouteImport } from './routes/channels'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VideosVideoIdRouteImport } from './routes/videos/$videoId'
+import { Route as PlaylistsPlaylistIdRouteImport } from './routes/playlists/$playlistId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const ShortsRoute = ShortsRouteImport.update({
@@ -41,6 +42,11 @@ const VideosVideoIdRoute = VideosVideoIdRouteImport.update({
   path: '/videos/$videoId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlaylistsPlaylistIdRoute = PlaylistsPlaylistIdRouteImport.update({
+  id: '/playlists/$playlistId',
+  path: '/playlists/$playlistId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/channels': typeof ChannelsRoute
   '/history': typeof HistoryRoute
   '/shorts': typeof ShortsRoute
+  '/playlists/$playlistId': typeof PlaylistsPlaylistIdRoute
   '/videos/$videoId': typeof VideosVideoIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -60,6 +67,7 @@ export interface FileRoutesByTo {
   '/channels': typeof ChannelsRoute
   '/history': typeof HistoryRoute
   '/shorts': typeof ShortsRoute
+  '/playlists/$playlistId': typeof PlaylistsPlaylistIdRoute
   '/videos/$videoId': typeof VideosVideoIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -69,6 +77,7 @@ export interface FileRoutesById {
   '/channels': typeof ChannelsRoute
   '/history': typeof HistoryRoute
   '/shorts': typeof ShortsRoute
+  '/playlists/$playlistId': typeof PlaylistsPlaylistIdRoute
   '/videos/$videoId': typeof VideosVideoIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -79,6 +88,7 @@ export interface FileRouteTypes {
     | '/channels'
     | '/history'
     | '/shorts'
+    | '/playlists/$playlistId'
     | '/videos/$videoId'
     | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
@@ -87,6 +97,7 @@ export interface FileRouteTypes {
     | '/channels'
     | '/history'
     | '/shorts'
+    | '/playlists/$playlistId'
     | '/videos/$videoId'
     | '/api/auth/$'
   id:
@@ -95,6 +106,7 @@ export interface FileRouteTypes {
     | '/channels'
     | '/history'
     | '/shorts'
+    | '/playlists/$playlistId'
     | '/videos/$videoId'
     | '/api/auth/$'
   fileRoutesById: FileRoutesById
@@ -104,6 +116,7 @@ export interface RootRouteChildren {
   ChannelsRoute: typeof ChannelsRoute
   HistoryRoute: typeof HistoryRoute
   ShortsRoute: typeof ShortsRoute
+  PlaylistsPlaylistIdRoute: typeof PlaylistsPlaylistIdRoute
   VideosVideoIdRoute: typeof VideosVideoIdRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
@@ -145,6 +158,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VideosVideoIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/playlists/$playlistId': {
+      id: '/playlists/$playlistId'
+      path: '/playlists/$playlistId'
+      fullPath: '/playlists/$playlistId'
+      preLoaderRoute: typeof PlaylistsPlaylistIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -160,6 +180,7 @@ const rootRouteChildren: RootRouteChildren = {
   ChannelsRoute: ChannelsRoute,
   HistoryRoute: HistoryRoute,
   ShortsRoute: ShortsRoute,
+  PlaylistsPlaylistIdRoute: PlaylistsPlaylistIdRoute,
   VideosVideoIdRoute: VideosVideoIdRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }

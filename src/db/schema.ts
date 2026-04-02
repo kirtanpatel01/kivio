@@ -158,6 +158,25 @@ export const videos = pgTable(
 	(table) => [index("videos_channelId_idx").on(table.channelId)],
 );
 
+export const playlists = pgTable(
+	"playlists",
+	{
+		id: text("id").primaryKey(), // YouTube Playlist ID
+		channelId: text("channel_id")
+			.notNull()
+			.references(() => youtubeChannels.channelId, { onDelete: "cascade" }),
+		title: text("title").notNull(),
+		description: text("description"),
+		thumbnail: text("thumbnail").notNull(),
+		itemCount: integer("item_count").notNull(),
+		publishedAt: text("published_at").notNull(),
+		fetchedAt: timestamp("fetched_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => [index("playlists_channelId_idx").on(table.channelId)],
+);
+
 export const notifications = pgTable(
 	"notifications",
 	{
@@ -228,6 +247,12 @@ export const channelRelations = relations(channels, ({ one }) => ({
 	}),
 }));
 
+export const youtubeChannelsRelations = relations(youtubeChannels, ({ many }) => ({
+	videos: many(videos),
+	playlists: many(playlists),
+	channels: many(channels),
+}));
+
 export const videosRelations = relations(videos, ({ one, many }) => ({
 	youtubeChannel: one(youtubeChannels, {
 		fields: [videos.channelId],
@@ -235,6 +260,13 @@ export const videosRelations = relations(videos, ({ one, many }) => ({
 	}),
 	notifications: many(notifications),
 	history: many(history),
+}));
+
+export const playlistsRelations = relations(playlists, ({ one }) => ({
+	youtubeChannel: one(youtubeChannels, {
+		fields: [playlists.channelId],
+		references: [youtubeChannels.channelId],
+	}),
 }));
 
 export const notificationRelations = relations(notifications, ({ one }) => ({

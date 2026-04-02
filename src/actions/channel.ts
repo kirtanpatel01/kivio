@@ -137,3 +137,71 @@ export const fetchChannelByHandle = createServerFn({ method: "GET" })
 			throw e;
 		}
 	});
+
+export const fetchChannelById = createServerFn({ method: "GET" })
+	.inputValidator((id: string) => id)
+	.handler(async ({ data: id }): Promise<YouTubeChannelDetails | null> => {
+		if (!id) return null;
+
+		// 1. Check database cache
+		const cached = await db.query.youtubeChannels.findFirst({
+			where: eq(youtubeChannels.channelId, id),
+		});
+
+		if (cached && Date.now() - cached.fetchedAt.getTime() < CACHE_TTL_MS) {
+			return {
+				id: cached.channelId,
+				title: cached.title,
+				description: cached.description,
+				customUrl: cached.customUrl,
+				publishedAt: cached.publishedAt,
+				country: cached.country ?? undefined,
+				thumbnails: {
+					default: { url: cached.thumbnailDefault },
+					medium: { url: cached.thumbnailMedium },
+					high: { url: cached.thumbnailHigh },
+				},
+				statistics: {
+					viewCount: cached.viewCount,
+					subscriberCount: cached.subscriberCount,
+					videoCount: cached.videoCount,
+				},
+				uploadsPlaylistId: cached.uploadsPlaylistId,
+			} as YouTubeChannelDetails;
+		}
+
+		// 2. Fetch from YouTube API if not cached or stale
+		const apiKey = getEnvVar("YOUTUBE_API_KEY")?.trim();
+		if (!apiKey) throw new Error("YouTube API Key not configured.");
+
+		const url = `https://www.googleapis.com/youtube/v3/channels?id=${encodeURIComponent(id)}&part=snippet,statistics,contentDetails&key=${apiKey}`;
+
+		try {
+			const res = await fetch(url);
+			if (!res.ok) return null;
+			const data = await res.json();
+			if (!data.items || data.items.length === 0) return null;
+
+			const item = data.items[0];
+			const result: YouTubeChannelDetails = {
+				id: item.id,
+				title: item.snippet.title,
+				description: item.snippet.description,
+				customUrl: item.snippet.customUrl,
+				publishedAt: item.snippet.publishedAt,
+				country: item.snippet.country,
+				thumbnails: item.snippet.thumbnails,
+				statistics: {
+					viewCount: item.statistics.viewCount,
+					subscriberCount: item.statistics.subscriberCount,
+					videoCount: item.statistics.videoCount,
+				},
+				uploadsPlaylistId: item.contentDetails.relatedPlaylists.uploads,
+			};
+
+			return result;
+		} catch (e: unknown) {
+			console.error("[YouTube API] fetchChannelById error:", e);
+			return null;
+		}
+	});
