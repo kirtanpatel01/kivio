@@ -217,7 +217,10 @@ export const fetchFeedForUser = createServerFn({ method: "GET" })
 			.filter(Boolean) as string[];
 
 		const result = await db.query.videos.findMany({
-			where: inArray(videos.channelId, channelIds),
+			where: sql`${inArray(videos.channelId, channelIds)} AND (${videos.isShort} IS NOT TRUE OR ${videos.isShort} IS NULL)`,
+			with: {
+				youtubeChannel: true,
+			},
 			orderBy: [
 				desc(
 					sql`(${videos.rawVideo} -> 'snippet' ->> 'publishedAt')::timestamptz`,
@@ -258,6 +261,7 @@ export const fetchFeedForUser = createServerFn({ method: "GET" })
 				channelId: v.channelId,
 				channelTitle: channel?.youtubeChannel?.title ?? "",
 				channelAvatar: channel?.youtubeChannel?.thumbnailMedium ?? "",
+				isShort: v.isShort ?? false,
 			};
 		});
 
@@ -312,3 +316,82 @@ export const fetchVideoDetails = createServerFn({ method: "GET" })
 			throw e;
 		}
 	});
+
+export const fetchShortsForUser = createServerFn({ method: "GET" })
+	.inputValidator((data?: { page?: number; limit?: number; currentVideoId?: string }) => data)
+	.handler(async ({ data }) => {
+		const session = await ensureSession();
+		const userId = session.user.id;
+		const page = data?.page ?? 0;
+		const limit = data?.limit ?? 10;
+		const currentVideoId = data?.currentVideoId;
+
+		const userChannels = await db.query.channels.findMany({
+			where: eq(channels.userId, userId),
+			with: { youtubeChannel: true },
+		});
+
+		if (userChannels.length === 0) return { videos: [], hasMore: false };
+
+		const channelIds = userChannels
+			.map((uc) => uc.youtubeChannel?.channelId)
+			.filter(Boolean) as string[];
+
+		let result = await db.query.videos.findMany({
+			where: sql`${inArray(videos.channelId, channelIds)} AND ${videos.isShort} IS TRUE`,
+			with: { youtubeChannel: true },
+			orderBy: [
+				desc(
+					sql`(${videos.rawVideo} -> 'snippet' ->> 'publishedAt')::timestamptz`,
+				),
+			],
+			limit: limit + 1,
+			offset: page * limit,
+		});
+
+		// If currentVideoId is provided and not in the result (only for page 0), 
+		// fetch it specifically and prepend it.
+		if (page === 0 && currentVideoId && !result.some(v => v.id === currentVideoId)) {
+			const specific = await db.query.videos.findFirst({
+				where: eq(videos.id, currentVideoId),
+				with: { youtubeChannel: true },
+			});
+			if (specific) {
+				result = [specific, ...result];
+			}
+		}
+
+		const hasMore = result.length > limit;
+		const feedVideos = result.slice(0, limit).map((v) => {
+
+			const channel = userChannels.find(
+				(uc) => uc.youtubeChannel?.channelId === v.channelId,
+			);
+			const rawVideo = v.rawVideo as any;
+			const rawSnippet = rawVideo?.snippet ?? null;
+			const rawContentDetails = rawVideo?.contentDetails ?? null;
+			const rawStatistics = rawVideo?.statistics ?? null;
+
+			return {
+				id: v.id,
+				title: rawSnippet?.title ?? "(untitled)",
+				thumbnail:
+					rawSnippet?.thumbnails?.high?.url ??
+					rawSnippet?.thumbnails?.default?.url ??
+					"",
+				publishedAt: rawSnippet?.publishedAt ?? new Date(0).toISOString(),
+				duration: rawContentDetails?.duration
+					? parseISO8601Duration(rawContentDetails.duration)
+					: null,
+				viewCount: rawStatistics?.viewCount ?? undefined,
+				likeCount: rawStatistics?.likeCount ?? undefined,
+				channelId: v.channelId,
+				channelTitle: channel?.youtubeChannel?.title ?? "",
+				channelAvatar: channel?.youtubeChannel?.thumbnailMedium ?? "",
+				isShort: true,
+			} as YouTubeVideo;
+		});
+
+		return { videos: feedVideos, hasMore };
+	});
+

@@ -9,12 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ShortsRouteImport } from './routes/shorts'
 import { Route as HistoryRouteImport } from './routes/history'
 import { Route as ChannelsRouteImport } from './routes/channels'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VideosVideoIdRouteImport } from './routes/videos/$videoId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
+const ShortsRoute = ShortsRouteImport.update({
+  id: '/shorts',
+  path: '/shorts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HistoryRoute = HistoryRouteImport.update({
   id: '/history',
   path: '/history',
@@ -45,6 +51,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/channels': typeof ChannelsRoute
   '/history': typeof HistoryRoute
+  '/shorts': typeof ShortsRoute
   '/videos/$videoId': typeof VideosVideoIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/channels': typeof ChannelsRoute
   '/history': typeof HistoryRoute
+  '/shorts': typeof ShortsRoute
   '/videos/$videoId': typeof VideosVideoIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -60,19 +68,33 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/channels': typeof ChannelsRoute
   '/history': typeof HistoryRoute
+  '/shorts': typeof ShortsRoute
   '/videos/$videoId': typeof VideosVideoIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/channels' | '/history' | '/videos/$videoId' | '/api/auth/$'
+  fullPaths:
+    | '/'
+    | '/channels'
+    | '/history'
+    | '/shorts'
+    | '/videos/$videoId'
+    | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/channels' | '/history' | '/videos/$videoId' | '/api/auth/$'
+  to:
+    | '/'
+    | '/channels'
+    | '/history'
+    | '/shorts'
+    | '/videos/$videoId'
+    | '/api/auth/$'
   id:
     | '__root__'
     | '/'
     | '/channels'
     | '/history'
+    | '/shorts'
     | '/videos/$videoId'
     | '/api/auth/$'
   fileRoutesById: FileRoutesById
@@ -81,12 +103,20 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ChannelsRoute: typeof ChannelsRoute
   HistoryRoute: typeof HistoryRoute
+  ShortsRoute: typeof ShortsRoute
   VideosVideoIdRoute: typeof VideosVideoIdRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/shorts': {
+      id: '/shorts'
+      path: '/shorts'
+      fullPath: '/shorts'
+      preLoaderRoute: typeof ShortsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/history': {
       id: '/history'
       path: '/history'
@@ -129,6 +159,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ChannelsRoute: ChannelsRoute,
   HistoryRoute: HistoryRoute,
+  ShortsRoute: ShortsRoute,
   VideosVideoIdRoute: VideosVideoIdRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }

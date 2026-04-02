@@ -1,7 +1,8 @@
-import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router";
+import { HeadContent, Scripts, createRootRoute, useRouterState } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import Header from "../components/Header";
+import { cn } from "#/lib/utils";
 
 import appCss from "../styles.css?url";
 
@@ -85,6 +86,10 @@ function PageNotFound() {
 
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+  const isShorts = useRouterState({
+    select: (s) => s.location.pathname === "/shorts",
+  });
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -93,7 +98,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body className="font-sans antialiased overflow-y-hidden">
         <Header />
-        <main className="h-[calc(100vh-3rem)] overflow-y-auto custom-scrollbar scrollbar-gutter-[stable]">
+        <main className={cn(
+          "h-[calc(100vh-3rem)] custom-scrollbar scrollbar-gutter-[stable]",
+          isShorts ? "overflow-y-hidden" : "overflow-y-auto"
+        )}>
           {children}
         </main>
 

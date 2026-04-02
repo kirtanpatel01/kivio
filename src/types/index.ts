@@ -32,6 +32,7 @@ export interface YouTubeVideo {
   likeCount?: string;
   subscriberCount?: string;
   uploadsPlaylistId?: string;
+  isShort?: boolean;
 }
 
 export interface YouTubeFeedResponse {

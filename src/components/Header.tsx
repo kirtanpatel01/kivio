@@ -14,6 +14,7 @@ const SPRING_CONFIG = {
 
 const links = [
   { path: "/", title: "Home" },
+  { path: "/shorts", title: "Shorts" },
   { path: "/channels", title: "Channels" },
   { path: "/history", title: "History" },
 ] as const;
