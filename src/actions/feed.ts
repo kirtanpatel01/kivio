@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { desc, eq, inArray, sql } from "drizzle-orm";
+import { desc, eq, inArray, sql, ilike, or, and } from "drizzle-orm";
 import { db } from "#/db";
 import { channels, videos } from "#/db/schema";
 import { ensureSession } from "#/lib/auth.functions";
@@ -7,12 +7,13 @@ import type { YouTubeVideo } from "#/types";
 import { mapDbVideoToYouTubeVideo } from "./videos";
 
 export const fetchFeedForUser = createServerFn({ method: "GET" })
-	.inputValidator((data?: { page?: number; limit?: number }) => data)
+	.inputValidator((data?: { page?: number; limit?: number; q?: string }) => data)
 	.handler(async ({ data }) => {
 		const session = await ensureSession();
 		const userId = session.user.id;
 		const page = data?.page ?? 0;
 		const limit = data?.limit ?? 20;
+		const q = data?.q?.trim();
 
 		const userChannels = await db.query.channels.findMany({
 			where: eq(channels.userId, userId),
@@ -20,13 +21,26 @@ export const fetchFeedForUser = createServerFn({ method: "GET" })
 		});
 
 		if (userChannels.length === 0) return { videos: [], hasMore: false };
-
 		const channelIds = userChannels
 			.map((uc) => uc.youtubeChannel?.channelId)
 			.filter(Boolean) as string[];
 
+		const conditions = [
+			inArray(videos.channelId, channelIds),
+			sql`(${videos.isShort} IS NOT TRUE OR ${videos.isShort} IS NULL)`,
+		];
+
+		if (q) {
+			conditions.push(
+				or(
+					ilike(sql`${videos.rawVideo} -> 'snippet' ->> 'title'`, `%${q}%`),
+					ilike(sql`${videos.rawPlaylistItem} -> 'snippet' ->> 'title'`, `%${q}%`),
+				) as any,
+			);
+		}
+
 		const result = await db.query.videos.findMany({
-			where: sql`${inArray(videos.channelId, channelIds)} AND (${videos.isShort} IS NOT TRUE OR ${videos.isShort} IS NULL)`,
+			where: and(...conditions),
 			with: {
 				youtubeChannel: true,
 			},

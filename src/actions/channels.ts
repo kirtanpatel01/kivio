@@ -19,10 +19,15 @@ export const getUserChannels = createServerFn({ method: "GET" }).handler(
 
 			const userChannels = await db.query.channels.findMany({
 				where: eq(channels.userId, userId),
-				orderBy: (channels, { desc }) => [desc(channels.createdAt)],
+				with: {
+					youtubeChannel: true,
+				},
 			});
 
-			return userChannels;
+			// Sort by channel title alphabetically
+			return userChannels.sort((a, b) => 
+				(a.youtubeChannel?.title ?? "").localeCompare(b.youtubeChannel?.title ?? "")
+			);
 		} catch (err: unknown) {
 			console.error("[Channels Action] getUserChannels error:", err);
 			throw err;

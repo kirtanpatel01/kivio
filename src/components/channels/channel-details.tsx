@@ -2,10 +2,13 @@ import {
 	IconBrandYoutube,
 	IconEye,
 	IconInfoCircle,
+	IconSearch,
 	IconUsers,
 	IconVideo,
+	IconX,
 } from "@tabler/icons-react";
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
 import VideoCard from "#/components/video-card";
 import { formatCount, formatDate } from "#/lib/utils";
 import type { YouTubeChannelDetails, YouTubePlaylist, YouTubeVideo } from "#/types";
@@ -23,17 +26,43 @@ export default function ChannelDetails() {
 			watchedIds: string[];
 		};
 
+	const [searchQuery, setSearchQuery] = useState("");
+
 	const setTab = (newTab: "videos" | "shorts" | "playlists") => {
+		setSearchQuery(""); // Clear search when switching tabs
 		navigate({
 			search: { handle, tab: newTab },
 		});
 	};
 
+	// Filter data based on tab AND search query
+	const filteredData = useMemo(() => {
+		const q = searchQuery.toLowerCase().trim();
+		
+		if (tab === "shorts") {
+			const shorts = channelVideos.filter(v => v.isShort);
+			if (!q) return shorts;
+			return shorts.filter(v => v.title.toLowerCase().includes(q));
+		}
+		
+		if (tab === "playlists") {
+			if (!q) return playlists;
+			return playlists.filter(p => p.title.toLowerCase().includes(q));
+		}
+		
+		// Default: Videos
+		const vids = channelVideos.filter(v => !v.isShort);
+		if (!q) return vids;
+		return vids.filter(v => v.title.toLowerCase().includes(q));
+	}, [tab, channelVideos, playlists, searchQuery]);
+
+	const watchedSet = new Set(watchedIds);
+
 	if (!handle) {
 		return (
 			<div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
-				<IconBrandYoutube size={48} strokeWidth={1.2} className="opacity-30" />
-				<p className="text-sm">Select a channel to view details</p>
+				<IconVideo size={48} strokeWidth={1.2} className="opacity-30" />
+				<p className="text-sm">Select a channel to view its library</p>
 			</div>
 		);
 	}
@@ -41,18 +70,11 @@ export default function ChannelDetails() {
 	if (!details) {
 		return (
 			<div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
-				<IconVideo size={48} strokeWidth={1.2} className="opacity-30" />
-				<p className="text-sm">Channel not found or data is unavailable</p>
+				<IconBrandYoutube size={48} strokeWidth={1.2} className="opacity-30" />
+				<p className="text-sm">Resolving channel metadata...</p>
 			</div>
 		);
 	}
-
-	const filteredVideos = channelVideos.filter((v) => {
-		if (tab === "shorts") return v.isShort === true;
-		return v.isShort !== true;
-	});
-
-	const watchedSet = new Set(watchedIds);
 
 	return (
 		<div className="flex flex-col min-h-full">
@@ -122,7 +144,7 @@ export default function ChannelDetails() {
 			{/* Videos from DB */}
 			<section className="flex-1 px-4 py-6 sm:px-6">
 				<div className="max-w-[1600px] mx-auto">
-					<div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+					<div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
 						<div className="flex flex-col gap-1">
 							<h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">
 								{tab === "shorts" 
@@ -136,6 +158,29 @@ export default function ChannelDetails() {
 									<IconInfoCircle size={12} />
 									<span>Video counts are cached for 24h</span>
 								</div>
+							)}
+						</div>
+
+						{/* Contextual Search Bar */}
+						<div className="relative flex-1 max-w-md group">
+							<IconSearch 
+								className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" 
+								size={16} 
+							/>
+							<input
+								type="text"
+								placeholder={`Search ${tab}...`}
+								value={searchQuery}
+								onChange={(e) => setSearchQuery(e.target.value)}
+								className="w-full bg-secondary/20 border border-border/40 rounded-xl py-2.5 pl-10 pr-10 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary/40 transition-all text-sm font-medium"
+							/>
+							{searchQuery && (
+								<button
+									onClick={() => setSearchQuery('')}
+									className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-secondary/80 text-muted-foreground transition-colors"
+								>
+									<IconX size={12} />
+								</button>
 							)}
 						</div>
 
@@ -175,14 +220,29 @@ export default function ChannelDetails() {
 							</button>
 						</div>
 					</div>
-					{tab === "playlists" ? (
-						playlists.length === 0 ? (
-							<div className="rounded-xl border border-dashed border-border/60 bg-secondary/10 py-16 text-center px-4">
-								<p className="text-sm font-medium text-foreground/80">No playlists found</p>
-							</div>
-						) : (
-							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-								{playlists.map((playlist) => (
+					{filteredData.length === 0 ? (
+						<div className="rounded-xl border border-dashed border-border/60 bg-secondary/10 py-16 text-center px-4">
+							{searchQuery ? (
+								<p className="text-sm font-medium text-foreground/80">
+									No {tab} found matching &quot;{searchQuery}&quot;
+								</p>
+							) : (
+								<>
+									<p className="text-sm font-medium text-foreground/80">
+										No {tab} found in this channel
+									</p>
+									{tab !== "playlists" && (
+										<p className="text-xs text-muted-foreground mt-2 max-w-sm mx-auto line-clamp-2">
+											Videos appear here after they are synced. Use &quot;Sync All Channels&quot; on the feed if needed.
+										</p>
+									)}
+								</>
+							)}
+						</div>
+					) : (
+						<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+							{tab === "playlists" ? (
+								(filteredData as YouTubePlaylist[]).map((playlist) => (
 									<Link
 										key={playlist.id}
 										to="/playlists/$playlistId"
@@ -209,35 +269,22 @@ export default function ChannelDetails() {
 											</p>
 										</div>
 									</Link>
-								))}
-							</div>
-						)
-					) : filteredVideos.length === 0 ? (
-						<div className="rounded-xl border border-dashed border-border/60 bg-secondary/10 py-16 text-center px-4">
-							<p className="text-sm font-medium text-foreground/80">
-								No videos stored yet
-							</p>
-							<p className="text-xs text-muted-foreground mt-2 max-w-sm mx-auto">
-								Videos appear here after they are synced to your feed. Open the
-								home feed and use &quot;Sync All Channels&quot; if you need to
-								backfill.
-							</p>
-						</div>
-					) : (
-						<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-							{filteredVideos.map((video) => (
-								<Link
-									to="/videos/$videoId"
-									params={{ videoId: video.id }}
-									key={video.id}
-									className="hover:scale-[1.01]"
-								>
-									<VideoCard
-										video={video}
-										isWatched={watchedSet.has(video.id)}
-									/>
-								</Link>
-							))}
+								))
+							) : (
+								(filteredData as YouTubeVideo[]).map((video) => (
+									<Link
+										to="/videos/$videoId"
+										params={{ videoId: video.id }}
+										key={video.id}
+										className="hover:scale-[1.01]"
+									>
+										<VideoCard
+											video={video}
+											isWatched={watchedSet.has(video.id)}
+										/>
+									</Link>
+								))
+							)}
 						</div>
 					)}
 				</div>

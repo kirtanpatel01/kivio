@@ -1,22 +1,32 @@
 import VideoCard from '#/components/video-card'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { z } from 'zod'
 import { fetchFeedForUser } from '#/actions/feed'
+import { getUserChannels } from '#/actions/channels'
 import { getWatchedVideoIds } from '#/actions/history'
 import type { YouTubeVideo } from '#/types'
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
-import { IconLoader } from '@tabler/icons-react'
+import { IconLoader, IconSearch, IconX } from '@tabler/icons-react'
 
 export const Route = createFileRoute('/')({
-  loader: async () => {
+  validateSearch: (search) => 
+    z.object({
+      q: z.string().optional()
+    }).parse(search),
+  loaderDeps: ({ search: { q } }) => ({ q }),
+  loader: async ({ deps: { q } }) => {
     try {
-      const [feed, watchedIds] = await Promise.all([
-        fetchFeedForUser(),
-        getWatchedVideoIds()
+      const [feed, watchedIds, followedChannels] = await Promise.all([
+        fetchFeedForUser({ data: { q } }),
+        getWatchedVideoIds(),
+        getUserChannels()
       ])
       return { 
         videos: feed?.videos || [], 
         hasMore: feed?.hasMore || false,
-        watchedIds: watchedIds || []
+        watchedIds: watchedIds || [],
+        followedChannels: followedChannels || [],
+        q: q || ''
       }
     } catch (e: any) {
       if (e.message === "Unauthorized") {
@@ -45,27 +55,37 @@ function ErrorState({ error }: { error: any }) {
 
 
 function Dashboard() {
-  const { videos: initialVideos, hasMore: initialHasMore, watchedIds } = Route.useLoaderData()
+  const { 
+    videos: initialVideos, 
+    hasMore: initialHasMore, 
+    watchedIds, 
+    q: initialQ,
+    followedChannels 
+  } = Route.useLoaderData()
+  
+  const navigate = useNavigate({ from: '/' })
   const [videos, setVideos] = useState(initialVideos)
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(initialHasMore)
   const [isFetchingMore, setIsFetchingMore] = useState(false)
   const observerTarget = useRef<HTMLDivElement>(null)
   const [selectedChannelIds, setSelectedChannelIds] = useState<string[]>([])
+  const [searchQuery, setSearchQuery] = useState(initialQ)
 
-  const uniqueChannels = useMemo(() => {
-    const channelMap = new Map<string, { id: string; title: string; avatar: string }>()
-    videos.forEach((v: YouTubeVideo) => {
-      if (!channelMap.has(v.channelId)) {
-        channelMap.set(v.channelId, {
-          id: v.channelId,
-          title: v.channelTitle,
-          avatar: v.channelAvatar || "",
-        })
-      }
-    })
-    return Array.from(channelMap.values())
-  }, [videos]);
+  // Update URL search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      navigate({ search: (prev) => ({ ...prev, q: searchQuery || undefined }) })
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  // Sync state if loader data changes
+  useEffect(() => {
+    setVideos(initialVideos)
+    setHasMore(initialHasMore)
+    setPage(0)
+  }, [initialVideos, initialHasMore])
 
   const filteredVideos = useMemo(() => {
     if (selectedChannelIds.length === 0) return videos
@@ -75,6 +95,27 @@ function Dashboard() {
   const toggleChannel = (id: string) => {
     setSelectedChannelIds((prev: string[]) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+    )
+  }
+
+  // If the user has NOT followed any channels yet (True Subscription Check)
+  if (!followedChannels || followedChannels.length === 0) {
+    return (
+      <div className="h-[80vh] flex flex-col items-center justify-center text-center gap-4 px-6 animate-in fade-in slide-in-from-bottom-5">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold">Your library is empty</h2>
+          <p className="text-muted-foreground max-w-sm mx-auto">
+            Follow channels to start building your personal, synced feed.
+          </p>
+        </div>
+        <Link 
+          to="/channels" 
+          search={{ tab: 'videos' }}
+          className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold hover:scale-[1.02] transition-transform shadow-lg shadow-primary/20"
+        >
+          Follow your first channel
+        </Link>
+      </div>
     )
   }
 
@@ -117,19 +158,23 @@ function Dashboard() {
     return () => observer.disconnect();
   }, [loadMore])
 
-  if (!videos || videos.length === 0) {
+  // If the user has NOT followed any channels yet (True Subscription Check)
+  if (!followedChannels || followedChannels.length === 0) {
     return (
-      <div className="h-[80vh] flex flex-col items-center justify-center text-center gap-4 px-6">
+      <div className="h-[80vh] flex flex-col items-center justify-center text-center gap-4 px-6 animate-in fade-in slide-in-from-bottom-5">
         <div className="space-y-2">
-          <h2 className="text-2xl font-bold">You haven't added any channel yet</h2>
+          <h2 className="text-2xl font-bold">Your library is empty</h2>
           <p className="text-muted-foreground max-w-sm mx-auto">
-            Add channels from the manage page to start building your personal feed.
+            Follow channels to start building your personal, synced feed.
           </p>
         </div>
-
-        <div className="text-muted-foreground text-sm mt-2">
-          Manage channels from the channels page.
-        </div>
+        <Link 
+          to="/channels" 
+          search={{ tab: 'videos' }}
+          className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold hover:scale-[1.02] transition-transform shadow-lg shadow-primary/20"
+        >
+          Follow your first channel
+        </Link>
       </div>
     )
   }
@@ -139,13 +184,13 @@ function Dashboard() {
       {/* Fixed Sidebar Filter */}
       <aside className="hidden md:flex flex-col w-72 h-[calc(100vh-4rem)] sticky top-0 border-r border-border/50 p-4 space-y-2 shrink-0">
         <div className="flex items-center justify-between">
-          <h2 className="text-xs font-bold tracking-widest text-muted-foreground">
+          <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">
             Channels
           </h2>
           {selectedChannelIds.length > 0 && (
             <button
               onClick={() => setSelectedChannelIds([])}
-              className="text-[10px] font-bold text-primary/80 tracking-wider hover:bg-pri cursor-pointer"
+              className="text-[10px] font-bold text-primary/80 tracking-wider hover:text-primary cursor-pointer transition-colors"
             >
               Reset
             </button>
@@ -155,7 +200,7 @@ function Dashboard() {
         <nav className="flex flex-col gap-2 overflow-y-auto pr-2 custom-scrollbar">
           <button
             onClick={() => setSelectedChannelIds([])}
-            className={`flex items-center p-3 rounded-xl text-sm font-semibold border cursor-pointer ${
+            className={`flex items-center p-3 rounded-xl text-sm font-bold border transition-all cursor-pointer ${
               selectedChannelIds.length === 0
                 ? 'bg-primary/80 hover:bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20'
                 : 'bg-transparent border-transparent text-foreground/80 hover:bg-secondary/60 hover:text-foreground'
@@ -164,42 +209,85 @@ function Dashboard() {
             All Channels
           </button>
 
-          {uniqueChannels.map((channel: any) => (
-            <button
-              key={channel.id}
-              onClick={() => toggleChannel(channel.id)}
-              className={`flex items-center gap-2 p-2 rounded-xl text-sm font-semibold border cursor-pointer ${
-                selectedChannelIds.includes(channel.id)
-                  ? 'bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20'
-                  : 'bg-transparent border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
-              }`}
-            >
-              <img
-                src={channel.avatar}
-                alt={channel.title}
-                className="size-8 rounded-full border border-border/20 shadow-sm shrink-0"
-              />
-              <span className="truncate">{channel.title}</span>
-            </button>
-          ))}
+          {followedChannels.map((uc: any) => {
+            const yc = uc.youtubeChannel
+            if (!yc) return null
+            
+            return (
+              <button
+                key={yc.channelId}
+                onClick={() => toggleChannel(yc.channelId)}
+                className={`flex items-center gap-2.5 p-2 rounded-xl text-sm font-semibold border transition-all cursor-pointer ${
+                  selectedChannelIds.includes(yc.channelId)
+                    ? 'bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20'
+                    : 'bg-transparent border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+                }`}
+              >
+                <img
+                  src={yc.thumbnailMedium}
+                  alt={yc.title}
+                  className="size-8 rounded-full border border-border/20 shadow-sm shrink-0 object-cover"
+                />
+                <span className="truncate">{yc.title}</span>
+              </button>
+            )
+          })}
         </nav>
       </aside>
 
       {/* Grid Content */}
-      <div className="flex-1 p-4">
+      <div className="flex-1 p-4 md:p-8">
+        {/* Search Bar */}
+        <div className="relative max-w-2xl mb-10 group">
+          <IconSearch 
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" 
+            size={20} 
+          />
+          <input
+            type="text"
+            placeholder="Search within your synced library..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-secondary/20 border border-border/50 rounded-2xl py-3.5 pl-12 pr-12 focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary/40 transition-all text-base font-medium placeholder:text-muted-foreground/50"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-full hover:bg-secondary/80 text-muted-foreground transition-colors"
+            >
+              <IconX size={16} />
+            </button>
+          )}
+        </div>
+
         {filteredVideos.length === 0 ? (
-          <div className="h-[60vh] flex flex-col items-center justify-center text-center space-y-2">
-            <p className="text-xl font-bold">No videos found</p>
-            <p className="text-sm text-muted-foreground">Try selecting a different filter.</p>
+          <div className="h-[40vh] flex flex-col items-center justify-center text-center space-y-4 animate-in fade-in fade-out duration-300">
+            <div className="size-16 rounded-full bg-secondary/20 flex items-center justify-center">
+              <IconSearch size={24} className="text-muted-foreground/30" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-lg font-bold">No data found</p>
+              <p className="text-sm text-muted-foreground max-w-xs">
+                We couldn't find any data matching &quot;<span className="text-foreground font-semibold">{searchQuery}</span>&quot; in your synced videos.
+              </p>
+            </div>
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery('')}
+                className="text-xs font-bold text-primary hover:underline"
+              >
+                Clear search
+              </button>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-8">
             {filteredVideos.map((video: any) => (
               <Link
                 to={`/videos/$videoId`}
                 params={{ videoId: video.id }}
                 key={video.id}
-                className="hover:scale-[1.01]"
+                className="hover:scale-[1.01] transition-transform"
               >
                 <VideoCard 
                   video={video} 
