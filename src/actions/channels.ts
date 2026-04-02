@@ -3,14 +3,10 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { channels, videos, youtubeChannels } from "#/db/schema";
 import { ensureSession } from "#/lib/auth.functions";
-import { fetchChannelByHandle } from "./youtube";
-
-function normalizeHandle(handle: string): string {
-	const t = handle.trim();
-	if (!t || t === "@") return "";
-	const withAt = t.startsWith("@") ? t : `@${t}`;
-	return withAt.toLowerCase();
-}
+import { normalizeHandle } from "#/lib/utils";
+import { fetchChannelByHandle } from "./channel";
+import { mapDbVideoToYouTubeVideo } from "./videos";
+import type { YouTubeVideo } from "#/types";
 
 export const getUserChannels = createServerFn({ method: "GET" }).handler(
 	async () => {
@@ -42,39 +38,18 @@ export const addUserChannel = createServerFn({ method: "POST" })
 			const userId = session.user.id;
 			if (!userId) throw new Error("Unauthorized");
 
+			// This function handles fetching from YouTube and caching the metadata automatically
 			const details = await fetchChannelByHandle({ data: handle });
 			if (!details) throw new Error("Channel not found");
 
-			await db
-				.insert(youtubeChannels)
-				.values({
-					handle: handle.toLowerCase(),
-					channelId: details.id,
-					title: details.title,
-					description: details.description,
-					customUrl: details.customUrl,
-					publishedAt: details.publishedAt,
-					country: details.country,
-					thumbnailDefault: details.thumbnails.default.url,
-					thumbnailMedium: details.thumbnails.medium.url,
-					thumbnailHigh: details.thumbnails.high.url,
-					viewCount: details.statistics.viewCount,
-					subscriberCount: details.statistics.subscriberCount,
-					videoCount: details.statistics.videoCount,
-					uploadsPlaylistId: details.uploadsPlaylistId,
-					fetchedAt: new Date(),
-				})
-				.onConflictDoUpdate({
-					target: youtubeChannels.handle,
-					set: { fetchedAt: new Date() },
-				});
-
+			// Link the user to the channel handle
 			const [newChannel] = await db
 				.insert(channels)
 				.values({
 					userId,
-					handle,
+					handle: normalizeHandle(handle),
 				})
+				.onConflictDoNothing() // Avoid double follow
 				.returning();
 
 			return newChannel;
@@ -125,14 +100,18 @@ export const getVideosForChannelHandle = createServerFn({ method: "GET" })
 		});
 		if (!yc) return [];
 
-		return db.query.videos.findMany({
+		const vids = await db.query.videos.findMany({
 			where: eq(videos.channelId, yc.channelId),
 			orderBy: [
 				desc(
 					sql`(${videos.rawVideo} -> 'snippet' ->> 'publishedAt')::timestamptz`,
 				),
 			],
-		}) as any;
+		});
+
+		return vids
+			.map((v) => mapDbVideoToYouTubeVideo(v, { title: yc.title, thumbnailMedium: yc.thumbnailMedium }))
+			.filter((v): v is YouTubeVideo => v !== null);
 	});
 
 export const updateUserChannel = createServerFn({ method: "POST" })
@@ -145,7 +124,7 @@ export const updateUserChannel = createServerFn({ method: "POST" })
 
 			const [updated] = await db
 				.update(channels)
-				.set({ handle })
+				.set({ handle: normalizeHandle(handle) })
 				.where(and(eq(channels.id, id), eq(channels.userId, userId)))
 				.returning();
 

@@ -49,3 +49,18 @@ export function parseISO8601DurationToSeconds(duration: string): number | null {
 	const seconds = match[3] ? parseInt(match[3], 10) : 0;
 	return hours * 3600 + minutes * 60 + seconds;
 }
+
+export function normalizeHandle(handle: string): string {
+    const t = handle.trim();
+    if (!t || t === "@") return "";
+    const withAt = t.startsWith("@") ? t : `@${t}`;
+    return withAt.toLowerCase();
+}
+
+export function formatDate(dateStr: string): string {
+	return new Date(dateStr).toLocaleDateString("en-US", {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+	});
+}

@@ -2,7 +2,7 @@ import { IconLoader } from "@tabler/icons-react";
 import { createFileRoute } from "@tanstack/react-router";
 import { getUserChannels, getVideosForChannelHandle } from "#/actions/channels";
 import { getWatchedVideoIds } from "#/actions/history";
-import { fetchChannelByHandle } from "#/actions/youtube";
+import { fetchChannelByHandle } from "#/actions/channel";
 import ChannelDetails from "#/components/channels/channel-details";
 import ChannelList from "#/components/channels/channel-list";
 import UnauthorizedState from "#/components/UnauthorizedState";

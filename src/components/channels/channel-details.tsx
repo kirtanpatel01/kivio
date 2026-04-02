@@ -8,64 +8,12 @@ import { getRouteApi, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import VideoCard from "#/components/video-card";
 import type { videos as videosSchema } from "#/db/schema";
-import { parseISO8601Duration } from "#/lib/utils";
+import { formatCount, formatDate, parseISO8601Duration } from "#/lib/utils";
 import type { YouTubeChannelDetails, YouTubeVideo } from "#/types";
 
+import { mapDbVideoToYouTubeVideo } from "#/actions/videos";
+
 type VideoRow = typeof videosSchema.$inferSelect;
-
-function formatCount(count: string): string {
-	const num = Number.parseInt(count, 10);
-	if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`;
-	if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
-	if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
-	return num.toLocaleString();
-}
-
-function formatDate(dateStr: string): string {
-	return new Date(dateStr).toLocaleDateString("en-US", {
-		year: "numeric",
-		month: "short",
-		day: "numeric",
-	});
-}
-
-function rowToYouTubeVideo(
-	row: VideoRow,
-	channelTitle: string,
-	channelAvatar: string,
-): YouTubeVideo {
-	const rawVideo = row.rawVideo as any;
-	const rawSnippet = rawVideo?.snippet ?? null;
-	const rawContentDetails = rawVideo?.contentDetails ?? null;
-	const rawStatistics = rawVideo?.statistics ?? null;
-
-	const rawPlaylistSnippet = (row.rawPlaylistItem as any)?.snippet ?? null;
-
-	const publishedAtIso =
-		rawSnippet?.publishedAt ?? rawPlaylistSnippet?.publishedAt ?? null;
-
-	const durationIso = rawContentDetails?.duration ?? null;
-	const duration = durationIso ? parseISO8601Duration(durationIso) : null;
-
-	const thumbnail =
-		rawSnippet?.thumbnails?.high?.url ??
-		rawSnippet?.thumbnails?.default?.url ??
-		"";
-
-	return {
-		id: row.id,
-		title: rawSnippet?.title ?? "(untitled)",
-		thumbnail,
-		publishedAt: publishedAtIso ?? new Date(0).toISOString(),
-		channelTitle,
-		channelId: row.channelId,
-		duration,
-		description: rawSnippet?.description ?? undefined,
-		viewCount: rawStatistics?.viewCount ?? undefined,
-		likeCount: rawStatistics?.likeCount ?? undefined,
-		channelAvatar,
-	};
-}
 
 const routeApi = getRouteApi("/channels");
 
@@ -74,7 +22,7 @@ export default function ChannelDetails() {
 	const { details, channelVideos, watchedIds } =
 		routeApi.useLoaderData() as {
 			details: YouTubeChannelDetails | null;
-			channelVideos: VideoRow[];
+			channelVideos: YouTubeVideo[];
 			watchedIds: string[];
 		};
 	const [tab, setTab] = useState<"videos" | "shorts">("videos");
@@ -97,18 +45,11 @@ export default function ChannelDetails() {
 		);
 	}
 
-	const channelAvatar =
-		details.thumbnails.medium?.url ?? details.thumbnails.high.url;
-
-	const filteredRows = channelVideos.filter((row) => {
-		if (tab === "shorts") return row.isShort === true;
-		// Treat NULL/unknown as non-short for now.
-		return row.isShort !== true;
+	const filteredVideos = channelVideos.filter((v) => {
+		if (tab === "shorts") return v.isShort === true;
+		return v.isShort !== true;
 	});
 
-	const mappedVideos: YouTubeVideo[] = filteredRows.map((row) =>
-		rowToYouTubeVideo(row, details.title, channelAvatar),
-	);
 	const watchedSet = new Set(watchedIds);
 
 	return (
@@ -209,7 +150,7 @@ export default function ChannelDetails() {
 							</button>
 						</div>
 					</div>
-					{mappedVideos.length === 0 ? (
+					{filteredVideos.length === 0 ? (
 						<div className="rounded-xl border border-dashed border-border/60 bg-secondary/10 py-16 text-center px-4">
 							<p className="text-sm font-medium text-foreground/80">
 								No videos stored yet
@@ -222,7 +163,7 @@ export default function ChannelDetails() {
 						</div>
 					) : (
 						<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-							{mappedVideos.map((video) => (
+							{filteredVideos.map((video) => (
 								<Link
 									to="/videos/$videoId"
 									params={{ videoId: video.id }}

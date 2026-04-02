@@ -1,7 +1,7 @@
 import { IconCheck, IconPencil, IconTrash, IconX } from "@tabler/icons-react";
 import type { channels } from "#/db/schema";
 import { useState } from "react";
-import { fetchChannelByHandle } from "#/actions/youtube";
+import { fetchChannelByHandle } from "#/actions/channel";
 import { removeUserChannel, updateUserChannel } from "#/actions/channels";
 import ChannelInput from "./channel-input";
 import { getRouteApi, useRouter } from "@tanstack/react-router";

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { IconPlus } from "@tabler/icons-react";
 import { addUserChannel } from "#/actions/channels";
-import { fetchChannelByHandle } from "#/actions/youtube";
+import { fetchChannelByHandle } from "#/actions/channel";
 
 function ChannelInput() {
   const [newChannelName, setNewChannelName] = useState("");

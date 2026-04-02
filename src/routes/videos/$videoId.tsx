@@ -1,4 +1,4 @@
-import { fetchVideoDetails, getSuggestedVideos } from "#/actions/youtube";
+import { fetchVideoDetails, getSuggestedVideos } from "#/actions/videos";
 import { recordHistory, getWatchedVideoIds } from "#/actions/history";
 import type { YouTubeVideo } from "#/types";
 import { createFileRoute, Link } from "@tanstack/react-router";

@@ -1,6 +1,6 @@
 import VideoCard from '#/components/video-card'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { fetchFeedForUser } from '#/actions/youtube'
+import { fetchFeedForUser } from '#/actions/feed'
 import { getWatchedVideoIds } from '#/actions/history'
 import type { YouTubeVideo } from '#/types'
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'

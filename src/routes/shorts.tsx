@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { fetchShortsForUser } from "#/actions/youtube";
+import { fetchShortsForUser } from "#/actions/feed";
 import ShortVideo from "#/components/short-video";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { IconLoader, IconChevronUp, IconChevronDown } from "@tabler/icons-react";

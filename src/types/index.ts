@@ -40,3 +40,14 @@ export interface YouTubeFeedResponse {
   nextPageTokens: Record<string, string>;
 }
 
+export interface YouTubePlaylist {
+  id: string;
+  title: string;
+  thumbnail: string;
+  description: string;
+  itemCount: number;
+  publishedAt: string;
+  channelId: string;
+  channelTitle: string;
+}
+
