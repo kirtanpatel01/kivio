@@ -1,4 +1,4 @@
-import { HeadContent, Scripts, createRootRoute, Link } from "@tanstack/react-router";
+import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import Header from "../components/Header";
@@ -64,56 +64,25 @@ export const Route = createRootRoute({
   shellComponent: RootDocument,
 });
 
-function AppError({ error, reset }: { error: any; reset: () => void }) {
+function AppError({ error }: { error: any }) {
   return (
-    <div className="h-[90vh] flex flex-col items-center justify-center p-6 text-center space-y-6 max-w-lg mx-auto">
-      <div className="size-20 bg-rose-500/10 rounded-3xl flex items-center justify-center text-rose-500 mb-2">
-         <span className="text-4xl font-bold">!</span>
-      </div>
-      <div className="space-y-2">
-        <h2 className="text-2xl font-bold tracking-tight">Something went wrong</h2>
-        <p className="text-muted-foreground text-sm">
-          {error?.message || "An unexpected error occurred. Please try again or refresh the page."}
-        </p>
-      </div>
-      <div className="flex gap-4">
-        <button
-          onClick={() => window.location.reload()}
-          className="px-6 py-2 bg-primary text-primary-foreground rounded-full font-semibold hover:opacity-90 shadow-lg shadow-primary/20 cursor-pointer"
-        >
-          Refresh Page
-        </button>
-        <button
-          onClick={() => reset()}
-          className="px-6 py-2 bg-secondary/40 text-foreground rounded-full font-semibold hover:bg-secondary cursor-pointer"
-        >
-          Try Again
-        </button>
-      </div>
+    <div className="h-[80vh] flex items-center justify-center p-6 text-center">
+      <p className="text-red-500 font-medium">
+        Something went wrong: {error?.message || "An unexpected error occurred."}
+      </p>
     </div>
   );
 }
 
+
 function PageNotFound() {
   return (
-    <div className="h-[90vh] flex flex-col items-center justify-center p-6 text-center space-y-6">
-       <img src="/logo.png" alt="Kivio" className="size-24 opacity-10 grayscale p-4 bg-black dark:bg-white rounded-4xl mb-2" />
-       <div className="space-y-2">
-        <h2 className="text-3xl font-black tracking-tighter italic">404</h2>
-        <h3 className="text-xl font-bold">Page Not Found</h3>
-        <p className="text-muted-foreground text-sm max-w-xs mx-auto">
-          The page you are looking for doesn't exist or has been moved.
-        </p>
-      </div>
-      <Link
-        to="/"
-        className="px-8 py-3 bg-black dark:bg-white text-white dark:text-black rounded-2xl font-black uppercase tracking-widest text-xs hover:scale-105 active:scale-95 shadow-2xl"
-      >
-        Go Home
-      </Link>
+    <div className="h-[80vh] flex flex-col items-center justify-center p-6 text-center gap-4">
+      <p className="text-xl font-bold italic tracking-tight uppercase">404 - Not Found</p>
     </div>
   );
 }
+
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (

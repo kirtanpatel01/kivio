@@ -45,35 +45,16 @@ export const Route = createFileRoute("/videos/$videoId")({
   errorComponent: ErrorState,
 })
 
-function ErrorState({ error, reset }: { error: any; reset: () => void }) {
+function ErrorState({ error }: { error: any }) {
   return (
-    <div className="h-screen flex flex-col items-center justify-center p-6 text-center space-y-6">
-      <div className="size-20 bg-rose-500/10 rounded-full flex items-center justify-center text-rose-500 animate-pulse">
-         <span className="text-4xl font-black">!</span>
-      </div>
-      <div className="space-y-2">
-        <h2 className="text-2xl font-bold italic tracking-tight uppercase">Playback Error</h2>
-        <p className="text-muted-foreground text-sm max-w-sm mx-auto">
-          {error?.message || "We encountered an issue while loading this video. Please try again or go back to the feed."}
-        </p>
-      </div>
-      <div className="flex gap-4">
-        <button
-          onClick={() => reset()}
-          className="px-8 py-2 bg-primary text-primary-foreground rounded-full font-semibold hover:opacity-90 shadow-lg shadow-primary/20 cursor-pointer"
-        >
-          Try Again
-        </button>
-        <Link
-          to="/"
-          className="px-8 py-2 bg-secondary/40 text-foreground rounded-full font-semibold hover:bg-secondary cursor-pointer"
-        >
-          Go Back
-        </Link>
-      </div>
+    <div className="h-screen flex items-center justify-center">
+      <p className="text-red-500 font-medium">
+        Playback Error: {error?.message || "Could not load video."}
+      </p>
     </div>
   );
 }
+
 
 function LinkifiedText({ text }: { text: string }) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -109,7 +90,6 @@ function RouteComponent() {
     return (
       <div className="h-screen flex flex-col items-center justify-center gap-4 text-center">
         <h2 className="text-2xl font-bold">Video not found</h2>
-        <Link to="/" className="text-primary hover:underline">Back to feed</Link>
       </div>
     );
   }

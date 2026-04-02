@@ -42,12 +42,6 @@ function ErrorState({ error, reset }: { error: any; reset: () => void }) {
           {error?.message || "There was an error retrieving your history. Check your connection and try again."}
         </p>
       </div>
-      <button
-        onClick={() => reset()}
-        className="px-10 py-2.5 bg-black dark:bg-white text-white dark:text-black rounded-lg font-black uppercase tracking-widest text-xs hover:scale-105 active:scale-95 shadow-xl transition-all"
-      >
-        Try Again
-      </button>
     </div>
   );
 }
@@ -145,7 +139,6 @@ function RouteComponent() {
         <div className="flex flex-col gap-4 p-4 sm:p-6 pt-32 sm:pt-36">
           {filteredHistory.length === 0 ? (
             <div className="text-center py-20 bg-secondary/5 rounded-3xl border border-dashed border-border/50">
-              <img src="/logo.png" alt="Kivio" className="size-16 opacity-15 mx-auto p-3 bg-black dark:bg-white rounded-2xl mb-4" />
               <p className="text-foreground-secondary font-semibold italic">
                 {search
                   ? "No matches found in your history"

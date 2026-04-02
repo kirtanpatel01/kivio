@@ -1,132 +1,244 @@
 import {
-  IconBrandYoutube,
-  IconEye,
-  IconUsers,
-  IconVideo,
+	IconBrandYoutube,
+	IconEye,
+	IconUsers,
+	IconVideo,
 } from "@tabler/icons-react";
-import { getRouteApi } from "@tanstack/react-router";
+import { getRouteApi, Link } from "@tanstack/react-router";
+import { useState } from "react";
+import VideoCard from "#/components/video-card";
+import type { videos as videosSchema } from "#/db/schema";
+import { parseISO8601Duration } from "#/lib/utils";
+import type { YouTubeChannelDetails, YouTubeVideo } from "#/types";
+
+type VideoRow = typeof videosSchema.$inferSelect;
 
 function formatCount(count: string): string {
-  const num = Number.parseInt(count, 10);
-  if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`;
-  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
-  if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
-  return num.toLocaleString();
+	const num = Number.parseInt(count, 10);
+	if (num >= 1_000_000_000) return `${(num / 1_000_000_000).toFixed(1)}B`;
+	if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
+	if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
+	return num.toLocaleString();
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+	return new Date(dateStr).toLocaleDateString("en-US", {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+	});
+}
+
+function rowToYouTubeVideo(
+	row: VideoRow,
+	channelTitle: string,
+	channelAvatar: string,
+): YouTubeVideo {
+	const rawVideo = row.rawVideo as any;
+	const rawSnippet = rawVideo?.snippet ?? null;
+	const rawContentDetails = rawVideo?.contentDetails ?? null;
+	const rawStatistics = rawVideo?.statistics ?? null;
+
+	const rawPlaylistSnippet = (row.rawPlaylistItem as any)?.snippet ?? null;
+
+	const publishedAtIso =
+		rawSnippet?.publishedAt ?? rawPlaylistSnippet?.publishedAt ?? null;
+
+	const durationIso = rawContentDetails?.duration ?? null;
+	const duration = durationIso ? parseISO8601Duration(durationIso) : null;
+
+	const thumbnail =
+		rawSnippet?.thumbnails?.high?.url ??
+		rawSnippet?.thumbnails?.default?.url ??
+		"";
+
+	return {
+		id: row.id,
+		title: rawSnippet?.title ?? "(untitled)",
+		thumbnail,
+		publishedAt: publishedAtIso ?? new Date(0).toISOString(),
+		channelTitle,
+		channelId: row.channelId,
+		duration,
+		description: rawSnippet?.description ?? undefined,
+		viewCount: rawStatistics?.viewCount ?? undefined,
+		likeCount: rawStatistics?.likeCount ?? undefined,
+		channelAvatar,
+	};
 }
 
 const routeApi = getRouteApi("/channels");
 
 export default function ChannelDetails() {
-  const { handle } = routeApi.useSearch();
-  const { details } = routeApi.useLoaderData();
+	const { handle } = routeApi.useSearch();
+	const { details, channelVideos, watchedIds } =
+		routeApi.useLoaderData() as {
+			details: YouTubeChannelDetails | null;
+			channelVideos: VideoRow[];
+			watchedIds: string[];
+		};
+	const [tab, setTab] = useState<"videos" | "shorts">("videos");
 
-  if (!handle) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
-        <IconBrandYoutube size={48} strokeWidth={1.2} className="opacity-30" />
-        <p className="text-sm">Select a channel to view details</p>
-      </div>
-    );
-  }
+	if (!handle) {
+		return (
+			<div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
+				<IconBrandYoutube size={48} strokeWidth={1.2} className="opacity-30" />
+				<p className="text-sm">Select a channel to view details</p>
+			</div>
+		);
+	}
 
-  if (!details) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
-        <IconVideo size={48} strokeWidth={1.2} className="opacity-30" />
-        <p className="text-sm">Channel not found or data is unavailable</p>
-      </div>
-    );
-  }
+	if (!details) {
+		return (
+			<div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
+				<IconVideo size={48} strokeWidth={1.2} className="opacity-30" />
+				<p className="text-sm">Channel not found or data is unavailable</p>
+			</div>
+		);
+	}
 
-  return (
-    <div className="max-w-2xl mx-auto p-6 space-y-6">
-      {/* Channel Header */}
-      <div className="flex items-start gap-5">
-        <img
-          src={details.thumbnails.high.url}
-          alt={details.title}
-          className="w-24 h-24 rounded-full border-2 border-primary/20 shadow-lg shadow-primary/5"
-        />
-        <div className="flex-1 min-w-0 space-y-1.5">
-          <h2 className="text-2xl font-bold tracking-tight truncate">
-            {details.title}
-          </h2>
-          <p className="text-sm text-muted-foreground font-medium">
-            {details.customUrl}
-          </p>
-          {details.country && (
-            <span className="inline-block text-xs bg-secondary/60 px-2 py-0.5 rounded-full text-muted-foreground">
-              {details.country}
-            </span>
-          )}
-        </div>
-      </div>
+	const channelAvatar =
+		details.thumbnails.medium?.url ?? details.thumbnails.high.url;
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-3 gap-3">
-        <StatCard
-          icon={<IconUsers size={20} className="text-primary/70" />}
-          value={formatCount(details.statistics.subscriberCount)}
-          label="Subscribers"
-        />
-        <StatCard
-          icon={<IconEye size={20} className="text-primary/70" />}
-          value={formatCount(details.statistics.viewCount)}
-          label="Total Views"
-        />
-        <StatCard
-          icon={<IconVideo size={20} className="text-primary/70" />}
-          value={formatCount(details.statistics.videoCount)}
-          label="Videos"
-        />
-      </div>
+	const filteredRows = channelVideos.filter((row) => {
+		if (tab === "shorts") return row.isShort === true;
+		// Treat NULL/unknown as non-short for now.
+		return row.isShort !== true;
+	});
 
-      {/* Channel Info */}
-      <div className="space-y-4">
-        <div>
-          <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1">
-            Joined
-          </h3>
-          <p className="text-sm">{formatDate(details.publishedAt)}</p>
-        </div>
+	const mappedVideos: YouTubeVideo[] = filteredRows.map((row) =>
+		rowToYouTubeVideo(row, details.title, channelAvatar),
+	);
+	const watchedSet = new Set(watchedIds);
 
-        {details.description && (
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
-              About
-            </h3>
-            <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-line">
-              {details.description}
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+	return (
+		<div className="flex flex-col min-h-full">
+			{/* Compact header */}
+			<header className="shrink-0 border-b border-border/60 bg-background/80 backdrop-blur-sm px-4 py-3 sm:px-6">
+				<div className="max-w-[1600px] mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+					<div className="flex items-center gap-3 min-w-0">
+						<img
+							src={details.thumbnails.high.url}
+							alt=""
+							className="size-14 sm:size-16 rounded-full border border-border/50 shrink-0 object-cover"
+						/>
+						<div className="min-w-0 flex-1">
+							<h1 className="text-lg sm:text-xl font-bold tracking-tight truncate">
+								{details.title}
+							</h1>
+							<p className="text-xs sm:text-sm text-muted-foreground truncate">
+								{details.customUrl}
+								{details.country ? (
+									<span className="text-muted-foreground/70">
+										{" "}
+										· {details.country}
+									</span>
+								) : null}
+							</p>
+						</div>
+					</div>
 
-function StatCard({
-  icon,
-  value,
-  label,
-}: {
-  icon: React.ReactNode;
-  value: string;
-  label: string;
-}) {
-  return (
-    <div className="bg-secondary/20 border border-border/50 rounded-xl p-4 flex flex-col items-center gap-1.5 hover:bg-secondary/30">
-      {icon}
-      <span className="text-lg font-bold">{value}</span>
-      <span className="text-xs text-muted-foreground">{label}</span>
-    </div>
-  );
+					<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm text-muted-foreground sm:ml-auto">
+						<span className="inline-flex items-center gap-1">
+							<IconUsers size={14} className="opacity-70" />
+							<span className="text-foreground font-medium">
+								{formatCount(details.statistics.subscriberCount)}
+							</span>
+							<span className="hidden sm:inline">subs</span>
+						</span>
+						<span className="text-border hidden sm:inline">·</span>
+						<span className="inline-flex items-center gap-1">
+							<IconEye size={14} className="opacity-70" />
+							<span className="text-foreground font-medium">
+								{formatCount(details.statistics.viewCount)}
+							</span>
+							<span className="hidden sm:inline">views</span>
+						</span>
+						<span className="text-border hidden sm:inline">·</span>
+						<span className="inline-flex items-center gap-1">
+							<IconVideo size={14} className="opacity-70" />
+							<span className="text-foreground font-medium">
+								{formatCount(details.statistics.videoCount)}
+							</span>
+							<span className="hidden sm:inline">videos</span>
+						</span>
+						<span className="text-border hidden sm:inline">·</span>
+						<span className="text-xs">
+							Joined {formatDate(details.publishedAt)}
+						</span>
+					</div>
+				</div>
+
+				{details.description ? (
+					<p className="max-w-[1600px] mx-auto mt-3 text-xs sm:text-sm text-muted-foreground leading-relaxed line-clamp-2 whitespace-pre-line">
+						{details.description}
+					</p>
+				) : null}
+			</header>
+
+			{/* Videos from DB */}
+			<section className="flex-1 px-4 py-6 sm:px-6">
+				<div className="max-w-[1600px] mx-auto">
+					<div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+						<h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase">
+							{tab === "shorts" ? "Shorts in Kivio" : "Videos in Kivio"}
+						</h2>
+
+						<div className="flex rounded-xl border border-border/60 bg-secondary/10 p-1 gap-1">
+							<button
+								type="button"
+								onClick={() => setTab("videos")}
+								className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+									tab === "videos"
+										? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+										: "text-foreground/70 hover:bg-secondary/60"
+								}`}
+							>
+								Videos
+							</button>
+							<button
+								type="button"
+								onClick={() => setTab("shorts")}
+								className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+									tab === "shorts"
+										? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+										: "text-foreground/70 hover:bg-secondary/60"
+								}`}
+							>
+								Shorts
+							</button>
+						</div>
+					</div>
+					{mappedVideos.length === 0 ? (
+						<div className="rounded-xl border border-dashed border-border/60 bg-secondary/10 py-16 text-center px-4">
+							<p className="text-sm font-medium text-foreground/80">
+								No videos stored yet
+							</p>
+							<p className="text-xs text-muted-foreground mt-2 max-w-sm mx-auto">
+								Videos appear here after they are synced to your feed. Open the
+								home feed and use &quot;Sync All Channels&quot; if you need to
+								backfill.
+							</p>
+						</div>
+					) : (
+						<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+							{mappedVideos.map((video) => (
+								<Link
+									to="/videos/$videoId"
+									params={{ videoId: video.id }}
+									key={video.id}
+									className="hover:scale-[1.01]"
+								>
+									<VideoCard
+										video={video}
+										isWatched={watchedSet.has(video.id)}
+									/>
+								</Link>
+							))}
+						</div>
+					)}
+				</div>
+			</section>
+		</div>
+	);
 }

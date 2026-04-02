@@ -1,5 +1,3 @@
-import LoginBtn from "./login-btn";
-
 interface UnauthorizedStateProps {
   title: string;
   description: string;
@@ -13,9 +11,6 @@ export default function UnauthorizedState({ title, description }: UnauthorizedSt
         <p className="text-muted-foreground text-sm leading-relaxed">
           {description}
         </p>
-      </div>
-      <div className="pt-2">
-        <LoginBtn />
       </div>
     </div>
   );
