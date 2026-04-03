@@ -84,6 +84,8 @@ function PageNotFound() {
   );
 }
 
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "../lib/query";
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   const isShorts = useRouterState({
@@ -97,13 +99,15 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body className="font-sans antialiased overflow-y-hidden">
-        <Header />
-        <main className={cn(
-          "h-[calc(100vh-3rem)] custom-scrollbar scrollbar-gutter-[stable]",
-          isShorts ? "overflow-y-hidden" : "overflow-y-auto"
-        )}>
-          {children}
-        </main>
+        <QueryClientProvider client={queryClient}>
+          <Header />
+          <main className={cn(
+            "h-[calc(100vh-3rem)] custom-scrollbar scrollbar-gutter-[stable]",
+            isShorts ? "overflow-y-hidden" : "overflow-y-auto"
+          )}>
+            {children}
+          </main>
+        </QueryClientProvider>
 
         <TanStackDevtools
           config={{

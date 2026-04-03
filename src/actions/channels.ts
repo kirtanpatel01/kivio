@@ -35,6 +35,8 @@ export const getUserChannels = createServerFn({ method: "GET" }).handler(
 	},
 );
 
+import { subscribeToChannelWebhooks } from "./webhooks";
+
 export const addUserChannel = createServerFn({ method: "POST" })
 	.inputValidator((handle: string) => handle)
 	.handler(async ({ data: handle }) => {
@@ -56,6 +58,13 @@ export const addUserChannel = createServerFn({ method: "POST" })
 				})
 				.onConflictDoNothing() // Avoid double follow
 				.returning();
+
+            // Trigger real-time notifications via Webhooks
+            if (details.id) {
+                subscribeToChannelWebhooks(details.id).catch((err) =>
+                    console.error(`[WebhookSync] Failed for ${details.id}:`, err),
+                );
+            }
 
 			return newChannel;
 		} catch (err: unknown) {

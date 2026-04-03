@@ -187,7 +187,12 @@ export const notifications = pgTable(
 		videoId: text("video_id")
 			.notNull()
 			.references(() => videos.id, { onDelete: "cascade" }),
+		title: text("title").notNull(),
+		channelTitle: text("channel_title").notNull(),
+		channelAvatar: text("channel_avatar").notNull(),
+		thumbnail: text("thumbnail").notNull(),
 		isRead: boolean("is_read").notNull().default(false),
+		type: text("type").notNull().default("video_upload"),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.notNull()
 			.defaultNow(),

@@ -15,6 +15,7 @@ import { Route as ChannelsRouteImport } from './routes/channels'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VideosVideoIdRouteImport } from './routes/videos/$videoId'
 import { Route as PlaylistsPlaylistIdRouteImport } from './routes/playlists/$playlistId'
+import { Route as ApiWebhooksYoutubeRouteImport } from './routes/api/webhooks/youtube'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const ShortsRoute = ShortsRouteImport.update({
@@ -47,6 +48,11 @@ const PlaylistsPlaylistIdRoute = PlaylistsPlaylistIdRouteImport.update({
   path: '/playlists/$playlistId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWebhooksYoutubeRoute = ApiWebhooksYoutubeRouteImport.update({
+  id: '/api/webhooks/youtube',
+  path: '/api/webhooks/youtube',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -61,6 +67,7 @@ export interface FileRoutesByFullPath {
   '/playlists/$playlistId': typeof PlaylistsPlaylistIdRoute
   '/videos/$videoId': typeof VideosVideoIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/webhooks/youtube': typeof ApiWebhooksYoutubeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,6 +77,7 @@ export interface FileRoutesByTo {
   '/playlists/$playlistId': typeof PlaylistsPlaylistIdRoute
   '/videos/$videoId': typeof VideosVideoIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/webhooks/youtube': typeof ApiWebhooksYoutubeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -80,6 +88,7 @@ export interface FileRoutesById {
   '/playlists/$playlistId': typeof PlaylistsPlaylistIdRoute
   '/videos/$videoId': typeof VideosVideoIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/webhooks/youtube': typeof ApiWebhooksYoutubeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -91,6 +100,7 @@ export interface FileRouteTypes {
     | '/playlists/$playlistId'
     | '/videos/$videoId'
     | '/api/auth/$'
+    | '/api/webhooks/youtube'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,6 +110,7 @@ export interface FileRouteTypes {
     | '/playlists/$playlistId'
     | '/videos/$videoId'
     | '/api/auth/$'
+    | '/api/webhooks/youtube'
   id:
     | '__root__'
     | '/'
@@ -109,6 +120,7 @@ export interface FileRouteTypes {
     | '/playlists/$playlistId'
     | '/videos/$videoId'
     | '/api/auth/$'
+    | '/api/webhooks/youtube'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -119,6 +131,7 @@ export interface RootRouteChildren {
   PlaylistsPlaylistIdRoute: typeof PlaylistsPlaylistIdRoute
   VideosVideoIdRoute: typeof VideosVideoIdRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiWebhooksYoutubeRoute: typeof ApiWebhooksYoutubeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -165,6 +178,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlaylistsPlaylistIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/webhooks/youtube': {
+      id: '/api/webhooks/youtube'
+      path: '/api/webhooks/youtube'
+      fullPath: '/api/webhooks/youtube'
+      preLoaderRoute: typeof ApiWebhooksYoutubeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -183,6 +203,7 @@ const rootRouteChildren: RootRouteChildren = {
   PlaylistsPlaylistIdRoute: PlaylistsPlaylistIdRoute,
   VideosVideoIdRoute: VideosVideoIdRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiWebhooksYoutubeRoute: ApiWebhooksYoutubeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
