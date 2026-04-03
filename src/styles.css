@@ -19,9 +19,9 @@
   --secondary: var(--color-zinc-300);
   --foreground-secondary: var(--color-zinc-500);
   --border: var(--color-zinc-300);
-
 }
 
+/* Handle system preference by default */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --background: var(--color-zinc-950);
@@ -31,6 +31,34 @@
     --foreground-secondary: var(--color-zinc-500);
     --border: var(--color-zinc-900);
   }
+}
+
+/* Override for explicit manual theme selection */
+[data-theme="dark"] {
+  --background: var(--color-zinc-950);
+  --foreground: var(--color-zinc-200);
+  --primary: var(--color-red-700);
+  --secondary: var(--color-zinc-800);
+  --foreground-secondary: var(--color-zinc-500);
+  --border: var(--color-zinc-900);
+}
+
+[data-theme="light"] {
+  --background: var(--color-zinc-100);
+  --foreground: var(--color-zinc-800);
+  --primary: var(--color-red-500);
+  --secondary: var(--color-zinc-300);
+  --foreground-secondary: var(--color-zinc-500);
+  --border: var(--color-zinc-300);
+}
+
+/* Ensure the app UI respects the system color-scheme when applied via data-theme */
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
 }
 
 * {

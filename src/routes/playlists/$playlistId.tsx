@@ -2,10 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { fetchPlaylistById, fetchPlaylistVideos } from "#/actions/playlists";
 import { fetchChannelById } from "#/actions/channel";
 import VideoCard from "#/components/video-card";
-import { IconInfoCircle, IconPlaylist } from "@tabler/icons-react";
+import { IconPlaylist, IconChevronLeft } from "@tabler/icons-react";
 import { formatDate } from "#/lib/utils";
 
 export const Route = createFileRoute("/playlists/$playlistId")({
+// ... (omitting lines for brevity, actually I should include the replacement specifically)
 	loader: async ({ params: { playlistId } }) => {
 		const [playlist, videos] = await Promise.all([
 			fetchPlaylistById({ data: playlistId }),
@@ -56,7 +57,16 @@ function PlaylistPage() {
 		<div className="flex flex-col min-h-screen">
 			{/* Playlist Header */}
 			<header className="shrink-0 border-b border-border/60 bg-background/80 backdrop-blur-sm px-4 py-6 sm:px-10">
-				<div className="max-w-[1600px] mx-auto flex flex-col md:flex-row gap-8 items-start">
+				<div className="max-w-[1600px] mx-auto space-y-6">
+					<button 
+						onClick={() => window.history.back()}
+						className="group flex items-center gap-1 pl-2 pr-4 py-2 rounded-full bg-secondary/60 hover:bg-secondary text-sm font-medium cursor-pointer transition-colors w-fit"
+					>
+						<IconChevronLeft size={18} className="group-hover:-translate-x-px" />
+						Back
+					</button>
+
+					<div className="flex flex-col md:flex-row gap-8 items-start">
 					<div className="relative w-full md:w-80 aspect-video rounded-2xl overflow-hidden shadow-2xl shrink-0">
 						<img
 							src={playlist.thumbnail}
@@ -83,11 +93,6 @@ function PlaylistPage() {
 							<div className="flex flex-wrap items-center gap-2 sm:gap-x-4 text-xs sm:text-sm text-muted-foreground font-medium">
 								<span className="text-foreground font-bold">{playlist.itemCount} videos</span>
 								<span className="hidden sm:inline opacity-30">•</span>
-								<div className="flex items-center gap-1.5 text-primary/70">
-									<IconInfoCircle size={14} />
-									<span>Count is not live</span>
-								</div>
-								<span className="hidden sm:inline opacity-30">•</span>
 								<span>Last updated {formatDate(playlist.publishedAt)}</span>
 							</div>
 						</div>
@@ -99,7 +104,8 @@ function PlaylistPage() {
 						) : null}
 					</div>
 				</div>
-			</header>
+			</div>
+		</header>
 
 			{/* Video Grid */}
 			<main className="flex-1 px-4 py-10 sm:px-10">
@@ -110,6 +116,7 @@ function PlaylistPage() {
 								key={video.id}
 								to="/videos/$videoId"
 								params={{ videoId: video.id }}
+								search={{ playlistId: playlist.id }}
 								className="hover:scale-[1.02] transition-transform duration-300"
 							>
 								<VideoCard video={video} />
