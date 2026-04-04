@@ -37,19 +37,27 @@ export const Route = createFileRoute("/api/webhooks/youtube")({
           console.log("[webhook POST] jsonObj: ", jsonObj);
 
           // Extract entry from Atom Feed
-          const entry = jsonObj.feed?.entry;
+          let entry = jsonObj.feed?.entry;
+
+          // YouTube often sends an array of entries. We want the newest one (first one).
+          if (Array.isArray(entry)) {
+            entry = entry[0];
+          }
+
           if (!entry) {
             console.warn("[WebhookPing] No entry found in Atom Feed.");
             return new Response("No entry", { status: 200 });
           }
-          console.log("[webhook POST] entry: ", entry);
 
-          // In Atom feeds, these might be prefixes like yt:videoId
-          // Depending on the parser, it might be entry["yt:videoId"] or similar
-          const videoId = entry["yt:videoId"];
-          const channelId = entry["yt:channelId"];
-          console.log("[webhook POST] videoId: ", videoId);
-          console.log("[webhook POST] channelId: ", channelId);
+          // In Atom feeds, tags like <yt:videoId> are often parsed as "yt:videoId"
+          // We add a few fallbacks just in case the parser behaves differently
+          const videoId = entry["yt:videoId"] || entry.id?.split(":").pop();
+          const channelId =
+            entry["yt:channelId"] || entry["author"]?.uri?.split("/").pop();
+
+          console.log(`[webhook POST] entry: `, entry);
+          console.log(`[webhook POST] videoId: ${videoId}`);
+          console.log(`[webhook POST] channelId: ${channelId}`);
 
           // Run sync in background (don't block the webhook response)
           if (videoId && channelId) {
