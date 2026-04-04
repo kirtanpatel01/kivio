@@ -15,42 +15,25 @@ export async function syncVideoAndNotifySubscribers(
   const apiKey = getEnvVar("YOUTUBE_API_KEY")?.trim();
   if (!apiKey) throw new Error("YouTube API Key not configured.");
 
-  console.log(
-    `[WebhookSync] Processing video ${videoId} for channel ${channelId}...`,
-  );
-
   try {
-    // 1. Fetch Video Details from YouTube
     const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=snippet,contentDetails,statistics&key=${apiKey}`;
-    console.log("[WebhookSync] detailsUrl: ", detailsUrl);
     const detailsRes = await fetch(detailsUrl);
-    console.log("[WebhookSync] detailsRes: ", detailsRes);
     if (!detailsRes.ok)
       throw new Error(`YouTube API error: ${await detailsRes.text()}`);
 
     const detailsData = await detailsRes.json();
-    console.log("[WebhookSync] detailsData: ", detailsData);
     const item = detailsData.items?.[0];
-    console.log("[WebhookSync] item: ", item);
     if (!item) {
-      console.warn(
-        `[WebhookSync] Video ${videoId} not found in API. It might be private or deleted.`,
-      );
       return;
     }
 
-    // 2. Prepare Video Metadata
     const durationIso: string | undefined = item?.contentDetails?.duration;
-    console.log("[WebhookSync] durationIso: ", durationIso);
     const durationSeconds = durationIso
       ? parseISO8601DurationToSeconds(durationIso)
       : null;
-    console.log("[WebhookSync] durationSeconds: ", durationSeconds);
     const isShort = durationSeconds !== null ? durationSeconds < 180 : null;
-    console.log("[WebhookSync] isShort: ", isShort);
 
-    // 3. Upsert to videos table
-    const video = await db
+    await db
       .insert(videos)
       .values({
         id: videoId,
@@ -67,21 +50,12 @@ export async function syncVideoAndNotifySubscribers(
           isShort,
         },
       });
-    console.log("[WebhookSync] videos table upserted: ", video);
 
-    // 4. Find all users following this channel
-    // Actually, our 'channels' table has 'handle' which references 'youtubeChannels.handle'.
-    // We should find the youtubeChannel by channelId first.
     const yc = await db.query.youtubeChannels.findFirst({
       where: eq(youtubeChannels.channelId, channelId),
     });
 
-    console.log("[WebhookSync] yc: ", yc);
-
     if (!yc) {
-      console.warn(
-        `[WebhookSync] Channel ${channelId} not found in our database. Skipping notifications.`,
-      );
       return;
     }
 
@@ -89,11 +63,8 @@ export async function syncVideoAndNotifySubscribers(
       where: eq(channels.handle, yc.handle),
     });
 
-    console.log("[WebhookSync] userSubscriptions: ", userSubscriptions);
-
     if (userSubscriptions.length === 0) return;
 
-    // 5. Create notifications for all followers
     const notificationRows = userSubscriptions.map((sub) => ({
       userId: sub.userId,
       videoId: videoId,
@@ -107,12 +78,7 @@ export async function syncVideoAndNotifySubscribers(
       type: "video_upload",
     }));
 
-    const notificationsResult = await db.insert(notifications).values(notificationRows);
-    console.log("[WebhookSync] notifications table upserted: ", notificationsResult);
-
-    console.log(
-      `[WebhookSync] Successfully synced video and created ${notificationRows.length} notifications.`,
-    );
+    await db.insert(notifications).values(notificationRows);
   } catch (error) {
     console.error(`[WebhookSync] Error for video ${videoId}:`, error);
     throw error;
