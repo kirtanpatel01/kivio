@@ -8,20 +8,29 @@ import { z } from "zod";
 
 export const Route = createFileRoute("/videos/$videoId")({
   validateSearch: (search) =>
-    z.object({
-      playlistId: z.string().optional(),
-    }).parse(search),
+    z
+      .object({
+        playlistId: z.string().optional(),
+      })
+      .parse(search),
   loaderDeps: ({ search: { playlistId } }) => ({ playlistId }),
   loader: async ({ params: { videoId }, deps: { playlistId } }) => {
     const [video, watchedIds] = await Promise.all([
       fetchVideoDetails({ data: videoId }),
-      getWatchedVideoIds()
+      getWatchedVideoIds(),
     ]);
-    
-    if (!video) return { video: null, suggestions: [], watchedIds: watchedIds || [], playlist: null, playlistVideos: [] };
+
+    if (!video)
+      return {
+        video: null,
+        suggestions: [],
+        watchedIds: watchedIds || [],
+        playlist: null,
+        playlistVideos: [],
+      };
 
     // Fetch suggestions from our local database instead of YouTube API
-    const suggestions = video.channelId 
+    const suggestions = video.channelId
       ? await getSuggestedVideos({ data: { channelId: video.channelId } })
       : [];
 
@@ -37,8 +46,8 @@ export const Route = createFileRoute("/videos/$videoId")({
       playlistVideos = v;
     }
 
-    return { 
-      video, 
+    return {
+      video,
       suggestions: suggestions || [],
       watchedIds: watchedIds || [],
       playlist: playlistData,
@@ -46,13 +55,15 @@ export const Route = createFileRoute("/videos/$videoId")({
     };
   },
   head: ({ loaderData }) => ({
-    title: loaderData?.video?.title 
-      ? `${loaderData.video.title} | Kivio` 
+    title: loaderData?.video?.title
+      ? `${loaderData.video.title} | Kivio`
       : "Video | Kivio",
     meta: [
       {
         name: "description",
-        content: loaderData?.video?.description?.slice(0, 160) || "Watch this video on Kivio.",
+        content:
+          loaderData?.video?.description?.slice(0, 160) ||
+          "Watch this video on Kivio.",
       },
       {
         property: "og:image",
@@ -62,7 +73,7 @@ export const Route = createFileRoute("/videos/$videoId")({
   }),
   component: RouteComponent,
   errorComponent: ErrorState,
-})
+});
 
 function ErrorState({ error }: { error: any }) {
   return (
@@ -74,13 +85,13 @@ function ErrorState({ error }: { error: any }) {
   );
 }
 
-
 import VideoPlayer from "#/components/video/VideoPlayer";
 import VideoDetails from "#/components/video/VideoDetails";
 import Sidebar from "#/components/video/Sidebar";
 
 function RouteComponent() {
-  const { video, suggestions, watchedIds, playlist, playlistVideos } = Route.useLoaderData();
+  const { video, suggestions, watchedIds, playlist, playlistVideos } =
+    Route.useLoaderData();
 
   const filteredSuggestions = useMemo(() => {
     return (suggestions as YouTubeVideo[]).filter((v) => v.id !== video?.id);
@@ -105,7 +116,7 @@ function RouteComponent() {
       </div>
 
       {/* RIGHT SECTION: Sidebar (Playlist & Suggestions) */}
-      <Sidebar 
+      <Sidebar
         currentVideoId={video.id}
         playlist={playlist}
         playlistVideos={playlistVideos}

@@ -3,7 +3,13 @@ import { IconHistory } from "@tabler/icons-react";
 import type { YouTubeVideo } from "#/types";
 import { getTimeAgo } from "#/lib/utils";
 
-function VideoCard({ video, isWatched }: { video: YouTubeVideo; isWatched?: boolean }) {
+function VideoCard({
+  video,
+  isWatched,
+}: {
+  video: YouTubeVideo;
+  isWatched?: boolean;
+}) {
   const publishedAt = new Date(video.publishedAt);
 
   const handleRecordHistory = () => {
@@ -20,12 +26,12 @@ function VideoCard({ video, isWatched }: { video: YouTubeVideo; isWatched?: bool
   };
 
   return (
-    <div 
+    <div
       className="w-full group cursor-pointer flex flex-col gap-3 relative"
       onClick={handleRecordHistory}
     >
       <div className="w-full h-full inset-0 absolute group-hover:bg-primary/5 z-0 group-hover:scale-[1.05] rounded-xl transition-all duration-500" />
-      
+
       {/* Thumbnail Container */}
       <div className="relative w-full aspect-video overflow-hidden rounded-2xl bg-secondary/20">
         <img

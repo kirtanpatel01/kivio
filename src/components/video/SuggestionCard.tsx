@@ -9,10 +9,13 @@ interface SuggestionCardProps {
   isWatched: boolean;
 }
 
-export default function SuggestionCard({ video, isWatched }: SuggestionCardProps) {
+export default function SuggestionCard({
+  video,
+  isWatched,
+}: SuggestionCardProps) {
   return (
-    <Link 
-      to={`/videos/$videoId`} 
+    <Link
+      to={`/videos/$videoId`}
       params={{ videoId: video.id }}
       onClick={() => {
         recordHistory({

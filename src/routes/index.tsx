@@ -1,33 +1,35 @@
-import VideoCard from '#/components/video-card'
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { z } from 'zod'
-import { fetchFeedForUser } from '#/actions/feed'
-import { getUserChannels } from '#/actions/channels'
-import { getWatchedVideoIds } from '#/actions/history'
-import type { YouTubeVideo } from '#/types'
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
-import { IconLoader, IconSearch, IconX } from '@tabler/icons-react'
+import VideoCard from "#/components/video-card";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { z } from "zod";
+import { fetchFeedForUser } from "#/actions/feed";
+import { getUserChannels } from "#/actions/channels";
+import { getWatchedVideoIds } from "#/actions/history";
+import type { YouTubeVideo } from "#/types";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { IconLoader, IconSearch, IconX } from "@tabler/icons-react";
 
-export const Route = createFileRoute('/')({
-  validateSearch: (search) => 
-    z.object({
-      q: z.string().optional()
-    }).parse(search),
+export const Route = createFileRoute("/")({
+  validateSearch: (search) =>
+    z
+      .object({
+        q: z.string().optional(),
+      })
+      .parse(search),
   loaderDeps: ({ search: { q } }) => ({ q }),
   loader: async ({ deps: { q } }) => {
     try {
       const [feed, watchedIds, followedChannels] = await Promise.all([
         fetchFeedForUser({ data: { q } }),
         getWatchedVideoIds(),
-        getUserChannels()
-      ])
-      return { 
-        videos: feed?.videos || [], 
+        getUserChannels(),
+      ]);
+      return {
+        videos: feed?.videos || [],
         hasMore: feed?.hasMore || false,
         watchedIds: watchedIds || [],
         followedChannels: followedChannels || [],
-        q: q || ''
-      }
+        q: q || "",
+      };
     } catch (e: any) {
       if (e.message === "Unauthorized") {
         throw e;
@@ -36,67 +38,71 @@ export const Route = createFileRoute('/')({
     }
   },
   head: () => ({
-    title: 'Feed | Kivio',
-    meta: []
+    title: "Feed | Kivio",
+    meta: [],
   }),
   component: Dashboard,
   errorComponent: ErrorState,
-})
+});
 
 function ErrorState({ error }: { error: any }) {
   return (
     <div className="p-10 flex justify-center">
       <p className="text-red-500 font-medium">
-        Error: {error?.message || "Failed to load feed. Please try again later."}
+        Error:{" "}
+        {error?.message || "Failed to load feed. Please try again later."}
       </p>
     </div>
   );
 }
 
-
 function Dashboard() {
-  const { 
-    videos: initialVideos, 
-    hasMore: initialHasMore, 
-    watchedIds, 
+  const {
+    videos: initialVideos,
+    hasMore: initialHasMore,
+    watchedIds,
     q: initialQ,
-    followedChannels 
-  } = Route.useLoaderData()
-  
-  const navigate = useNavigate({ from: '/' })
-  const [videos, setVideos] = useState(initialVideos)
-  const [page, setPage] = useState(0)
-  const [hasMore, setHasMore] = useState(initialHasMore)
-  const [isFetchingMore, setIsFetchingMore] = useState(false)
-  const observerTarget = useRef<HTMLDivElement>(null)
-  const [selectedChannelIds, setSelectedChannelIds] = useState<string[]>([])
-  const [searchQuery, setSearchQuery] = useState(initialQ)
+    followedChannels,
+  } = Route.useLoaderData();
+
+  const navigate = useNavigate({ from: "/" });
+  const [videos, setVideos] = useState(initialVideos);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const observerTarget = useRef<HTMLDivElement>(null);
+  const [selectedChannelIds, setSelectedChannelIds] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState(initialQ);
 
   // Update URL search query
   useEffect(() => {
     const timer = setTimeout(() => {
-      navigate({ search: (prev) => ({ ...prev, q: searchQuery || undefined }) })
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [searchQuery])
+      navigate({
+        search: (prev) => ({ ...prev, q: searchQuery || undefined }),
+      });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Sync state if loader data changes
   useEffect(() => {
-    setVideos(initialVideos)
-    setHasMore(initialHasMore)
-    setPage(0)
-  }, [initialVideos, initialHasMore])
+    setVideos(initialVideos);
+    setHasMore(initialHasMore);
+    setPage(0);
+  }, [initialVideos, initialHasMore]);
 
   const filteredVideos = useMemo(() => {
-    if (selectedChannelIds.length === 0) return videos
-    return videos.filter((v: YouTubeVideo) => selectedChannelIds.includes(v.channelId))
+    if (selectedChannelIds.length === 0) return videos;
+    return videos.filter((v: YouTubeVideo) =>
+      selectedChannelIds.includes(v.channelId),
+    );
   }, [videos, selectedChannelIds]);
 
   const toggleChannel = (id: string) => {
     setSelectedChannelIds((prev: string[]) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
-    )
-  }
+    );
+  };
 
   // If the user has NOT followed any channels yet (True Subscription Check)
   if (!followedChannels || followedChannels.length === 0) {
@@ -108,55 +114,55 @@ function Dashboard() {
             Follow channels to start building your personal, synced feed.
           </p>
         </div>
-        <Link 
-          to="/channels" 
-          search={{ tab: 'videos' }}
+        <Link
+          to="/channels"
+          search={{ tab: "videos" }}
           className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold hover:scale-[1.02] transition-transform shadow-lg shadow-primary/20"
         >
           Follow your first channel
         </Link>
       </div>
-    )
+    );
   }
 
   const loadMore = useCallback(async () => {
-    if (isFetchingMore || !hasMore) return
+    if (isFetchingMore || !hasMore) return;
 
-    setIsFetchingMore(true)
+    setIsFetchingMore(true);
     try {
-      const nextPage = page + 1
-      const result = await fetchFeedForUser({ data: { page: nextPage } })
+      const nextPage = page + 1;
+      const result = await fetchFeedForUser({ data: { page: nextPage } });
       if (result && result.videos.length > 0) {
-        setVideos((prev: any[]) => [...prev, ...result.videos])
-        setPage(nextPage)
-        setHasMore(result.hasMore)
+        setVideos((prev: any[]) => [...prev, ...result.videos]);
+        setPage(nextPage);
+        setHasMore(result.hasMore);
       } else {
-        setHasMore(false)
+        setHasMore(false);
       }
     } catch (err) {
-      console.error("[Dashboard] Error loading more videos:", err)
+      console.error("[Dashboard] Error loading more videos:", err);
     } finally {
-      setIsFetchingMore(false)
+      setIsFetchingMore(false);
     }
-  }, [page, hasMore, isFetchingMore])
+  }, [page, hasMore, isFetchingMore]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
         if (entry && entry.isIntersecting) {
-          loadMore()
+          loadMore();
         }
       },
       { threshold: 0.1 },
-    )
+    );
 
     if (observerTarget.current) {
-      observer.observe(observerTarget.current)
+      observer.observe(observerTarget.current);
     }
 
     return () => observer.disconnect();
-  }, [loadMore])
+  }, [loadMore]);
 
   // If the user has NOT followed any channels yet (True Subscription Check)
   if (!followedChannels || followedChannels.length === 0) {
@@ -168,15 +174,15 @@ function Dashboard() {
             Follow channels to start building your personal, synced feed.
           </p>
         </div>
-        <Link 
-          to="/channels" 
-          search={{ tab: 'videos' }}
+        <Link
+          to="/channels"
+          search={{ tab: "videos" }}
           className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold hover:scale-[1.02] transition-transform shadow-lg shadow-primary/20"
         >
           Follow your first channel
         </Link>
       </div>
-    )
+    );
   }
 
   return (
@@ -202,25 +208,25 @@ function Dashboard() {
             onClick={() => setSelectedChannelIds([])}
             className={`flex items-center p-3 rounded-xl text-sm font-bold border transition-all cursor-pointer ${
               selectedChannelIds.length === 0
-                ? 'bg-primary/80 hover:bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20'
-                : 'bg-transparent border-transparent text-foreground/80 hover:bg-secondary/60 hover:text-foreground'
+                ? "bg-primary/80 hover:bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20"
+                : "bg-transparent border-transparent text-foreground/80 hover:bg-secondary/60 hover:text-foreground"
             }`}
           >
             All Channels
           </button>
 
           {followedChannels.map((uc: any) => {
-            const yc = uc.youtubeChannel
-            if (!yc) return null
-            
+            const yc = uc.youtubeChannel;
+            if (!yc) return null;
+
             return (
               <button
                 key={yc.channelId}
                 onClick={() => toggleChannel(yc.channelId)}
                 className={`flex items-center gap-2.5 p-2 rounded-xl text-sm font-semibold border transition-all cursor-pointer ${
                   selectedChannelIds.includes(yc.channelId)
-                    ? 'bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20'
-                    : 'bg-transparent border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+                    ? "bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20"
+                    : "bg-transparent border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
                 }`}
               >
                 <img
@@ -230,7 +236,7 @@ function Dashboard() {
                 />
                 <span className="truncate">{yc.title}</span>
               </button>
-            )
+            );
           })}
         </nav>
       </aside>
@@ -239,9 +245,9 @@ function Dashboard() {
       <div className="flex-1 p-4 md:p-8">
         {/* Search Bar */}
         <div className="relative max-w-2xl mb-10 group">
-          <IconSearch 
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" 
-            size={20} 
+          <IconSearch
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors"
+            size={20}
           />
           <input
             type="text"
@@ -252,7 +258,7 @@ function Dashboard() {
           />
           {searchQuery && (
             <button
-              onClick={() => setSearchQuery('')}
+              onClick={() => setSearchQuery("")}
               className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-full hover:bg-secondary/80 text-muted-foreground transition-colors"
             >
               <IconX size={16} />
@@ -268,12 +274,16 @@ function Dashboard() {
             <div className="space-y-1">
               <p className="text-lg font-bold">No data found</p>
               <p className="text-sm text-muted-foreground max-w-xs">
-                We couldn't find any data matching &quot;<span className="text-foreground font-semibold">{searchQuery}</span>&quot; in your synced videos.
+                We couldn't find any data matching &quot;
+                <span className="text-foreground font-semibold">
+                  {searchQuery}
+                </span>
+                &quot; in your synced videos.
               </p>
             </div>
             {searchQuery && (
-              <button 
-                onClick={() => setSearchQuery('')}
+              <button
+                onClick={() => setSearchQuery("")}
                 className="text-xs font-bold text-primary hover:underline"
               >
                 Clear search
@@ -289,9 +299,9 @@ function Dashboard() {
                 key={video.id}
                 className="hover:scale-[1.01] transition-transform"
               >
-                <VideoCard 
-                  video={video} 
-                  isWatched={watchedIds.includes(video.id)} 
+                <VideoCard
+                  video={video}
+                  isWatched={watchedIds.includes(video.id)}
                 />
               </Link>
             ))}
@@ -299,19 +309,21 @@ function Dashboard() {
         )}
 
         {/* Observer Target & Loading State */}
-        <div 
-          ref={observerTarget} 
+        <div
+          ref={observerTarget}
           className="w-full py-12 flex items-center justify-center"
           style={{ opacity: hasMore ? 1 : 0 }}
         >
           {isFetchingMore && (
-             <div className="flex items-center gap-3 text-muted-foreground animate-in fade-in slide-in-from-bottom-2">
-               <IconLoader className="animate-spin" size={20} />
-               <span className="text-sm font-medium">Loading more videos...</span>
-             </div>
+            <div className="flex items-center gap-3 text-muted-foreground animate-in fade-in slide-in-from-bottom-2">
+              <IconLoader className="animate-spin" size={20} />
+              <span className="text-sm font-medium">
+                Loading more videos...
+              </span>
+            </div>
           )}
         </div>
       </div>
     </main>
-  )
+  );
 }

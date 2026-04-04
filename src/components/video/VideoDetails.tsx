@@ -38,7 +38,9 @@ export default function VideoDetails({ video }: VideoDetailsProps) {
             </div>
 
             <div className="border-l border-primary/30 pl-4 flex flex-col gap-0.5 text-sm">
-              <span className="font-semibold">{formatCount(video.viewCount || 0)} views</span>
+              <span className="font-semibold">
+                {formatCount(video.viewCount || 0)} views
+              </span>
               <span className="text-xs text-foreground-secondary italic">
                 {new Date(video.publishedAt).toLocaleDateString()}
               </span>

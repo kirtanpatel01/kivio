@@ -17,6 +17,11 @@ const config = defineConfig({
     viteReact(),
     nitro(),
   ],
+  server: {
+    allowedHosts: [
+      "unjuvenilely-nonveritable-kelsie.ngrok-free.dev",
+    ],
+  },
   environments: {
     ssr: { build: { rollupOptions: { input: "./server.ts" } } },
   },

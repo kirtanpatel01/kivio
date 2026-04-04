@@ -26,7 +26,10 @@ function UserDropdown() {
   const { data, isPending } = authClient.useSession();
   const user = data?.user;
 
-  if (isPending) return <div className="size-8 rounded-full bg-secondary animate-pulse shrink-0"></div>
+  if (isPending)
+    return (
+      <div className="size-8 rounded-full bg-secondary animate-pulse shrink-0"></div>
+    );
 
   return (
     <>

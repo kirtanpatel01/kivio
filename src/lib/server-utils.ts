@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
 
 export function getEnvVar(key: string): string | undefined {
-  if (typeof process === 'undefined') return undefined;
+  if (typeof process === "undefined") return undefined;
   if (process.env[key]) return process.env[key];
   try {
     const envPath = resolve(process.cwd(), ".env");
@@ -18,4 +18,3 @@ export function getEnvVar(key: string): string | undefined {
   }
   return undefined;
 }
-

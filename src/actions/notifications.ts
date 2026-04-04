@@ -69,21 +69,21 @@ export const markAllAsRead = createServerFn({ method: "POST" }).handler(
  * Maintenance task to delete notifications older than 30 days.
  * This can be triggered by a cron job or a background process.
  */
-export const deleteOldNotifications = createServerFn({ method: "POST" }).handler(
-  async () => {
-    try {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+export const deleteOldNotifications = createServerFn({
+  method: "POST",
+}).handler(async () => {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      await db
-        .delete(notifications)
-        .where(lt(notifications.createdAt, thirtyDaysAgo));
+    await db
+      .delete(notifications)
+      .where(lt(notifications.createdAt, thirtyDaysAgo));
 
-      console.log(`[Cleanup] Deleted old notifications.`);
-      return { success: true };
-    } catch (err: unknown) {
-      console.error("[Cleanup Action] deleteOldNotifications error:", err);
-      throw err;
-    }
-  },
-);
+    console.log(`[Cleanup] Deleted old notifications.`);
+    return { success: true };
+  } catch (err: unknown) {
+    console.error("[Cleanup Action] deleteOldNotifications error:", err);
+    throw err;
+  }
+});

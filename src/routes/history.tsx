@@ -1,4 +1,10 @@
-import { IconHistory, IconSearch, IconTrash, IconX, IconLoader } from "@tabler/icons-react";
+import {
+  IconHistory,
+  IconSearch,
+  IconTrash,
+  IconX,
+  IconLoader,
+} from "@tabler/icons-react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { getHistory, deleteHistoryItem, clearHistory } from "#/actions/history";
@@ -12,19 +18,20 @@ export const Route = createFileRoute("/history")({
     return { initialHistory: history || [] };
   },
   head: () => ({
-    title: 'History | Kivio',
-    meta: []
+    title: "History | Kivio",
+    meta: [],
   }),
   component: RouteComponent,
   errorComponent: ErrorState,
 });
 
-function ErrorState({ error, reset }: { error: any; reset: () => void }) {
-  const isUnauthorized = error?.message === "Unauthorized" || error?.status === 401;
+function ErrorState({ error }: { error: any }) {
+  const isUnauthorized =
+    error?.message === "Unauthorized" || error?.status === 401;
 
   if (isUnauthorized) {
     return (
-      <UnauthorizedState 
+      <UnauthorizedState
         title="Your Watch History"
         description="Sign in to Kivio to save your watch history and pick up where you left off."
       />
@@ -34,12 +41,15 @@ function ErrorState({ error, reset }: { error: any; reset: () => void }) {
   return (
     <div className="h-[calc(100vh-3rem)] flex flex-col items-center justify-center p-6 text-center space-y-4">
       <div className="size-16 bg-rose-500/10 rounded-2xl flex items-center justify-center text-rose-500 mb-2">
-         <span className="text-4xl font-black">!</span>
+        <span className="text-4xl font-black">!</span>
       </div>
       <div className="space-y-1">
-        <h2 className="text-xl font-bold italic tracking-tight uppercase">History Error</h2>
+        <h2 className="text-xl font-bold italic tracking-tight uppercase">
+          History Error
+        </h2>
         <p className="text-muted-foreground text-sm max-w-xs mx-auto">
-          {error?.message || "There was an error retrieving your history. Check your connection and try again."}
+          {error?.message ||
+            "There was an error retrieving your history. Check your connection and try again."}
         </p>
       </div>
     </div>
@@ -63,7 +73,7 @@ function RouteComponent() {
 
   if (!session) {
     return (
-      <UnauthorizedState 
+      <UnauthorizedState
         title="Sign in to track history"
         description="You need to be logged in to save your watch history and pick up where you left off."
       />
@@ -111,7 +121,7 @@ function RouteComponent() {
           >
             Clear All History
           </button>
- 
+
           {/* Search Bar */}
           <div className="relative group">
             <IconSearch
@@ -134,7 +144,7 @@ function RouteComponent() {
             )}
           </div>
         </div>
- 
+
         {/* History List */}
         <div className="flex flex-col gap-4 p-4 sm:p-6 pt-32 sm:pt-36">
           {filteredHistory.length === 0 ? (
@@ -167,7 +177,7 @@ function RouteComponent() {
                     {video.duration}
                   </div>
                 </div>
- 
+
                 {/* Content */}
                 <div className="flex-1 flex flex-col justify-center gap-1 overflow-hidden pr-10">
                   <h3 className="font-semibold line-clamp-2 leading-tight group-hover:text-primary">
@@ -195,7 +205,7 @@ function RouteComponent() {
                     </p>
                   </div>
                 </div>
- 
+
                 {/* Individual Remove Button */}
                 <button
                   onClick={(e) => removeItem(video.id, e)}

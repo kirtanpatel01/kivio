@@ -87,7 +87,7 @@ export default function ChannelList({ channels }: { channels: Channel[] }) {
                 }`}
                 onClick={() => {
                   navigate({
-                    search: { handle: channel.handle },
+                    search: (prev) => ({ ...prev, handle: channel.handle }),
                   });
                 }}
               >

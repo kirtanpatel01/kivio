@@ -2,7 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { fetchShortsForUser } from "#/actions/feed";
 import ShortVideo from "#/components/short-video";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { IconLoader, IconChevronUp, IconChevronDown } from "@tabler/icons-react";
+import {
+  IconLoader,
+  IconChevronUp,
+  IconChevronDown,
+} from "@tabler/icons-react";
 import { z } from "zod";
 
 const shortsSearchSchema = z.object({
@@ -39,7 +43,8 @@ function ShortsPage() {
 
   const [activeId, setActiveId] = useState<string | null>(() => {
     if (currentVideoId) return currentVideoId;
-    if (initialVideos.length > 0 && initialVideos[0]) return initialVideos[0].id;
+    if (initialVideos.length > 0 && initialVideos[0])
+      return initialVideos[0].id;
     return null;
   });
 
@@ -71,7 +76,7 @@ function ShortsPage() {
       // Scroll the container to the right video if needed
       const element = document.getElementById(`video-${currentVideoId}`);
       if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        element.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     }
   }, [currentVideoId]);
@@ -82,10 +87,10 @@ function ShortsPage() {
       (entries) => {
         const entry = entries[0];
         if (entry && entry.isIntersecting) {
-            loadMore();
+          loadMore();
         }
       },
-      { threshold: 0.1 }
+      { threshold: 0.1 },
     );
 
     if (observerTarget.current) observer.observe(observerTarget.current);
@@ -102,7 +107,8 @@ function ShortsPage() {
     const observer = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         if (entry.isIntersecting) {
-          const videoId = entry.target.getAttribute("data-video-id") ?? undefined;
+          const videoId =
+            entry.target.getAttribute("data-video-id") ?? undefined;
           if (videoId && videoId !== activeId) {
             setActiveId(videoId);
             navigate({ search: { v: videoId }, replace: true });
@@ -117,25 +123,28 @@ function ShortsPage() {
     return () => observer.disconnect();
   }, [videos, activeId, navigate]);
 
-  const handleScrollManual = (direction: 'up' | 'down') => {
+  const handleScrollManual = (direction: "up" | "down") => {
     if (!containerRef.current) return;
-    
+
     const container = containerRef.current;
     const currentScroll = container.scrollTop;
     const itemHeight = container.clientHeight;
-    
-    const newScroll = direction === 'up' 
-      ? currentScroll - itemHeight 
-      : currentScroll + itemHeight;
-      
-    container.scrollTo({ top: newScroll, behavior: 'smooth' });
+
+    const newScroll =
+      direction === "up"
+        ? currentScroll - itemHeight
+        : currentScroll + itemHeight;
+
+    container.scrollTo({ top: newScroll, behavior: "smooth" });
   };
 
   if (videos.length === 0) {
     return (
       <div className="h-[80vh] flex flex-col items-center justify-center text-center gap-4 px-6">
         <h2 className="text-2xl font-bold">No shorts found</h2>
-        <p className="text-muted-foreground">Add more channels to see shorts here.</p>
+        <p className="text-muted-foreground">
+          Add more channels to see shorts here.
+        </p>
       </div>
     );
   }
@@ -145,14 +154,14 @@ function ShortsPage() {
       {/* Scroll Controls (Right Side) */}
       <div className="absolute right-6 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-50">
         <button
-          onClick={() => handleScrollManual('up')}
+          onClick={() => handleScrollManual("up")}
           className="size-12 rounded-full bg-secondary/80 backdrop-blur-md border border-border/50 flex items-center justify-center text-foreground hover:bg-primary hover:text-primary-foreground hover:scale-110 transition-all shadow-xl active:scale-95 cursor-pointer"
           title="Previous Video"
         >
           <IconChevronUp size={28} stroke={2.5} />
         </button>
         <button
-          onClick={() => handleScrollManual('down')}
+          onClick={() => handleScrollManual("down")}
           className="size-12 rounded-full bg-secondary/80 backdrop-blur-md border border-border/50 flex items-center justify-center text-foreground hover:bg-primary hover:text-primary-foreground hover:scale-110 transition-all shadow-xl active:scale-95 cursor-pointer"
           title="Next Video"
         >
@@ -160,31 +169,28 @@ function ShortsPage() {
         </button>
       </div>
 
-      <div 
+      <div
         ref={containerRef}
         className="flex-1 overflow-y-scroll snap-y snap-mandatory custom-scrollbar"
       >
         {videos.map((video) => (
-          <div 
-            key={video.id} 
+          <div
+            key={video.id}
             id={`video-${video.id}`}
             data-video-id={video.id}
             className="snap-start"
           >
-            <ShortVideo 
-              video={video} 
-              isActive={activeId === video.id} 
-            />
+            <ShortVideo video={video} isActive={activeId === video.id} />
           </div>
         ))}
 
         {/* Load More Trigger */}
-        <div 
+        <div
           ref={observerTarget}
           className="h-20 flex items-center justify-center"
         >
           {isFetchingMore && (
-             <IconLoader className="animate-spin text-primary" size={32} />
+            <IconLoader className="animate-spin text-primary" size={32} />
           )}
         </div>
       </div>

@@ -1,4 +1,9 @@
-import { HeadContent, Scripts, createRootRoute, useRouterState } from "@tanstack/react-router";
+import {
+  HeadContent,
+  Scripts,
+  createRootRoute,
+  useRouterState,
+} from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import Header from "../components/Header";
@@ -21,7 +26,8 @@ export const Route = createRootRoute({
       },
       {
         name: "description",
-        content: "Kivio is a minimal YouTube client. Manage your channels, track history and discover new videos with ease.",
+        content:
+          "Kivio is a minimal YouTube client. Manage your channels, track history and discover new videos with ease.",
       },
       {
         name: "keywords",
@@ -33,7 +39,8 @@ export const Route = createRootRoute({
       },
       {
         property: "og:description",
-        content: "Track your YouTube history and manage your favorite channels in one place.",
+        content:
+          "Track your YouTube history and manage your favorite channels in one place.",
       },
       {
         property: "og:image",
@@ -69,17 +76,19 @@ function AppError({ error }: { error: any }) {
   return (
     <div className="h-[80vh] flex items-center justify-center p-6 text-center">
       <p className="text-red-500 font-medium">
-        Something went wrong: {error?.message || "An unexpected error occurred."}
+        Something went wrong:{" "}
+        {error?.message || "An unexpected error occurred."}
       </p>
     </div>
   );
 }
 
-
 function PageNotFound() {
   return (
     <div className="h-[80vh] flex flex-col items-center justify-center p-6 text-center gap-4">
-      <p className="text-xl font-bold italic tracking-tight uppercase">404 - Not Found</p>
+      <p className="text-xl font-bold italic tracking-tight uppercase">
+        404 - Not Found
+      </p>
     </div>
   );
 }
@@ -101,10 +110,12 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body className="font-sans antialiased overflow-y-hidden">
         <QueryClientProvider client={queryClient}>
           <Header />
-          <main className={cn(
-            "h-[calc(100vh-3rem)] custom-scrollbar scrollbar-gutter-[stable]",
-            isShorts ? "overflow-y-hidden" : "overflow-y-auto"
-          )}>
+          <main
+            className={cn(
+              "h-[calc(100vh-3rem)] custom-scrollbar scrollbar-gutter-[stable]",
+              isShorts ? "overflow-y-hidden" : "overflow-y-auto",
+            )}
+          >
             {children}
           </main>
         </QueryClientProvider>

@@ -11,12 +11,12 @@ interface SidebarProps {
   watchedIds: string[];
 }
 
-export default function Sidebar({ 
-  currentVideoId, 
-  playlist, 
-  playlistVideos, 
-  suggestions, 
-  watchedIds 
+export default function Sidebar({
+  currentVideoId,
+  playlist,
+  playlistVideos,
+  suggestions,
+  watchedIds,
 }: SidebarProps) {
   return (
     <div className="hidden lg:flex flex-col w-[400px] h-full overflow-y-auto custom-scrollbar bg-secondary/5 px-2 py-4 space-y-4">
@@ -28,7 +28,8 @@ export default function Sidebar({
               {playlist.title}
             </h3>
             <p className="text-xs text-foreground-secondary font-medium">
-              {playlistVideos.findIndex(v => v.id === currentVideoId) + 1} / {playlistVideos.length}
+              {playlistVideos.findIndex((v) => v.id === currentVideoId) + 1} /{" "}
+              {playlistVideos.length}
             </p>
           </div>
           <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-1">
@@ -52,10 +53,10 @@ export default function Sidebar({
 
       <div className="flex flex-col gap-4">
         {suggestions.map((v) => (
-          <SuggestionCard 
-            key={v.id} 
-            video={v} 
-            isWatched={watchedIds.includes(v.id)} 
+          <SuggestionCard
+            key={v.id}
+            video={v}
+            isWatched={watchedIds.includes(v.id)}
           />
         ))}
       </div>

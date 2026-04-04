@@ -9,15 +9,20 @@ interface PlaylistVideoCardProps {
   playlistId: string;
 }
 
-export default function PlaylistVideoCard({ video, isCurrent, index, playlistId }: PlaylistVideoCardProps) {
+export default function PlaylistVideoCard({
+  video,
+  isCurrent,
+  index,
+  playlistId,
+}: PlaylistVideoCardProps) {
   return (
-    <Link 
-      to={`/videos/$videoId`} 
+    <Link
+      to={`/videos/$videoId`}
       params={{ videoId: video.id }}
       search={{ playlistId }}
       className={`group flex gap-3 p-2 rounded-xl border transition-all duration-200 ${
-        isCurrent 
-          ? "bg-primary/10 border-primary/20 shadow-sm" 
+        isCurrent
+          ? "bg-primary/10 border-primary/20 shadow-sm"
           : "hover:bg-secondary/40 border-transparent hover:border-border/10"
       }`}
       onClick={() => {
@@ -44,7 +49,9 @@ export default function PlaylistVideoCard({ video, isCurrent, index, playlistId 
         </div>
       </div>
       <div className="flex flex-col gap-0.5 overflow-hidden">
-        <h4 className={`text-xs font-semibold line-clamp-2 leading-snug ${isCurrent ? "text-primary" : "group-hover:text-primary"}`}>
+        <h4
+          className={`text-xs font-semibold line-clamp-2 leading-snug ${isCurrent ? "text-primary" : "group-hover:text-primary"}`}
+        >
           {video.title}
         </h4>
         <p className="text-[10px] text-foreground-secondary font-medium">

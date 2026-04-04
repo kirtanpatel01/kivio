@@ -8,7 +8,7 @@ interface VideoPlayerProps {
 export default function VideoPlayer({ videoId, title }: VideoPlayerProps) {
   return (
     <div className="space-y-4">
-      <button 
+      <button
         onClick={() => window.history.back()}
         className="group flex items-center gap-1 pl-2 pr-4 py-2 rounded-full bg-secondary/80 hover:bg-secondary text-sm font-medium cursor-pointer"
       >
