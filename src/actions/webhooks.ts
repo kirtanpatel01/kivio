@@ -7,7 +7,9 @@ import { getEnvVar } from "#/lib/server-utils";
 export async function subscribeToChannelWebhooks(channelId: string) {
   const hubUrl = "https://pubsubhubbub.appspot.com/subscribe";
 
+  // Public URL for the webhook (MUST be set in env for production, or ngrok for dev)
   const webhookBaseUrl = getEnvVar("WEBHOOK_URL") || "https://your-app.com";
+  console.log(webhookBaseUrl)
   const callbackUrl = `${webhookBaseUrl}/api/webhooks/youtube`;
   const topicUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
 
