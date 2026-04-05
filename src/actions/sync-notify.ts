@@ -22,7 +22,7 @@ export async function syncVideoAndNotifySubscribers(
   try {
     // 1. Fetch Video Details from YouTube
     const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=snippet,contentDetails,statistics&key=${apiKey}`;
-    console.log("[WebhookSync] detailsUrl: ", detailsUrl);
+    // console.log("[WebhookSync] detailsUrl: ", detailsUrl);
     const detailsRes = await fetch(detailsUrl);
     console.log("[WebhookSync] detailsRes: ", detailsRes);
     if (!detailsRes.ok)
