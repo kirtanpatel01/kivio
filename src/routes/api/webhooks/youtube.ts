@@ -52,8 +52,13 @@ export const Route = createFileRoute("/api/webhooks/youtube")({
           // In Atom feeds, tags like <yt:videoId> are often parsed as "yt:videoId"
           // We add a few fallbacks just in case the parser behaves differently
           const videoId = entry["yt:videoId"] || entry.id?.split(":").pop();
-          const channelId =
+          let channelId =
             entry["yt:channelId"] || entry["author"]?.uri?.split("/").pop();
+
+          // BULLETPROOF ID logic: Ensure channelId ALWAYS starts with UC 🛡️
+          if (channelId && !channelId.startsWith("UC") && !channelId.startsWith("HC")) {
+             channelId = "UC" + channelId;
+          }
 
           console.log(`[webhook POST] entry: `, entry);
           console.log(`[webhook POST] videoId: ${videoId}`);

@@ -17,7 +17,32 @@ export default function NotificationBell() {
   const { data: notifications = [] } = useQuery({
     queryKey: ["notifications"],
     queryFn: () => getNotifications(),
-    refetchInterval: 30000, // Poll every 30 seconds for real-time feel
+  });
+
+  // REAL REAL-TIME LISTENER! 🌪️🌪️🌪️
+  useState(() => {
+    if (typeof window !== "undefined") {
+      const eventSource = new EventSource("/api/notifications/stream");
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "refresh") {
+            queryClient.invalidateQueries({ queryKey: ["notifications"] });
+          }
+        } catch (e) {
+          // Heartbeats and empty messages
+        }
+      };
+
+      eventSource.onerror = () => {
+        eventSource.close();
+      };
+
+      // Cleanup
+      window.addEventListener("beforeunload", () => eventSource.close());
+    }
+    return null;
   });
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
