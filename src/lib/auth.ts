@@ -6,10 +6,12 @@ import { tanstackStartCookies } from "better-auth/tanstack-start";
 
 export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET,
-  baseURL: process.env.BETTER_AUTH_URL || "https://kivio.kjpatel.workers.dev",
+  baseURL: process.env.BETTER_AUTH_URL,
   trustedOrigins: [
-    "http://localhost:3000",
-    "https://kivio.kjpatel.workers.dev",
+    "http://localhost:*",
+    "https://*.workers.dev",
+    "https://*.pages.dev",
+    ...(process.env.BETTER_AUTH_TRUSTED_ORIGINS?.split(",").map((s) => s.trim()) || []),
     ...(process.env.BETTER_AUTH_URL ? [process.env.BETTER_AUTH_URL] : []),
   ],
   database: drizzleAdapter(db, {
