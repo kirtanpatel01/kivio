@@ -10,18 +10,22 @@ import { Link } from "@tanstack/react-router";
 import { cn, formatDate } from "#/lib/utils";
 import { motion, AnimatePresence } from "motion/react";
 import Avatar from "#/components/Avatar";
+import { authClient } from "#/lib/auth-client";
 
 export default function NotificationBell() {
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
+  const { data: session } = authClient.useSession();
 
   const { data: notifications = [] } = useQuery({
     queryKey: ["notifications"],
     queryFn: () => getNotifications(),
+    enabled: !!session?.user,
   });
 
   // Real-time notification updates via SSE
   useEffect(() => {
+    if (!session?.user) return;
     const eventSource = new EventSource("/api/notifications/stream");
 
     eventSource.onmessage = (event) => {
