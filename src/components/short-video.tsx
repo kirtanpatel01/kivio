@@ -64,7 +64,9 @@ export default function ShortVideo({ video, isActive }: ShortVideoProps) {
             ref={iframeRef}
             src={`https://www.youtube.com/embed/${video.id}?autoplay=${isActive ? 1 : 0}&modestbranding=1&rel=0&iv_load_policy=3&controls=0&disablekb=1&enablejsapi=1&origin=${window.location.origin}`}
             title={video.title}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allowFullScreen
             className="w-full h-full border-0 pointer-events-none"
           />
         </div>

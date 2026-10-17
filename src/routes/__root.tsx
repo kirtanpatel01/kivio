@@ -19,7 +19,7 @@ export const Route = createRootRoute({
     meta: [
       {
         name: "referrer",
-        content: "no-referrer",
+        content: "strict-origin-when-cross-origin",
       },
       {
         charSet: "utf-8",
