@@ -110,6 +110,11 @@ export async function syncVideoAndNotifySubscribers(
     const notificationsResult = await db.insert(notifications).values(notificationRows);
     console.log("[WebhookSync] notifications table upserted: ", notificationsResult);
 
+    // REAL-TIME BROADCAST! 🌪️
+    import("#/lib/notification-events").then(({ notificationEvents, NOTIFICATION_EVENT }) => {
+      notificationEvents.emit(NOTIFICATION_EVENT, { userId: notificationRows[0]?.userId });
+    });
+
     console.log(
       `[WebhookSync] Successfully synced video and created ${notificationRows.length} notifications.`,
     );
