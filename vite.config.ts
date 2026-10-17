@@ -11,10 +11,16 @@ import { cloudflare } from "@cloudflare/vite-plugin";
 const rolldownCompat = (): import("vite").Plugin => ({
 	name: "tanstack-start-rolldown-compat",
 	configEnvironment(_name, envConfig) {
-		if (envConfig.build?.rolldownOptions) {
-			envConfig.build.rollupOptions = {
-				...envConfig.build.rolldownOptions,
-				...envConfig.build.rollupOptions,
+		const build = envConfig.build as
+			| (import("vite").BuildEnvironmentOptions & {
+					rolldownOptions?: Record<string, unknown>;
+			  })
+			| undefined;
+
+		if (build?.rolldownOptions) {
+			build.rollupOptions = {
+				...build.rolldownOptions,
+				...build.rollupOptions,
 			};
 		}
 	},
