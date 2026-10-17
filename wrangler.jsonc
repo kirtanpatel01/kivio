@@ -8,6 +8,11 @@
     "directory": "dist/client",
     "binding": "ASSETS"
   },
+  "vars": {
+    "BETTER_AUTH_URL": "https://kivio.kjpatel.workers.dev",
+    "GOOGLE_CLIENT_ID": "87504852845-lcld8fdmoapd2cdbq8ledat90kdo4fbe.apps.googleusercontent.com",
+    "WEBHOOK_URL": "https://kivio.kjpatel.workers.dev"
+  },
   "observability": {
     "logs": {
       "enabled": true,
