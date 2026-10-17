@@ -3,6 +3,7 @@ import { IconChevronDown } from "@tabler/icons-react";
 import { formatCount } from "#/lib/utils";
 import type { YouTubeVideo } from "#/types";
 import { LinkifiedText } from "./LinkifiedText";
+import Avatar from "#/components/Avatar";
 
 interface VideoDetailsProps {
   video: YouTubeVideo;
@@ -22,10 +23,10 @@ export default function VideoDetails({ video }: VideoDetailsProps) {
 
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-3 cursor-pointer group">
-              <img
+              <Avatar
                 src={video.channelAvatar}
-                alt={video.channelTitle}
-                className="w-12 h-12 rounded-full border-2 border-transparent group-hover:border-primary object-cover"
+                name={video.channelTitle}
+                className="w-12 h-12 rounded-full border-2 border-transparent group-hover:border-primary object-cover text-sm font-bold"
               />
               <div>
                 <h2 className="font-semibold text-sm sm:text-base">

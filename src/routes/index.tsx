@@ -1,4 +1,5 @@
 import VideoCard from "#/components/video-card";
+import Avatar from "#/components/Avatar";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import { fetchFeedForUser } from "#/actions/feed";
@@ -104,27 +105,6 @@ function Dashboard() {
     );
   };
 
-  // If the user has NOT followed any channels yet (True Subscription Check)
-  if (!followedChannels || followedChannels.length === 0) {
-    return (
-      <div className="h-[80vh] flex flex-col items-center justify-center text-center gap-4 px-6 animate-in fade-in slide-in-from-bottom-5">
-        <div className="space-y-2">
-          <h2 className="text-2xl font-bold">Your library is empty</h2>
-          <p className="text-muted-foreground max-w-sm mx-auto">
-            Follow channels to start building your personal, synced feed.
-          </p>
-        </div>
-        <Link
-          to="/channels"
-          search={{ tab: "videos" }}
-          className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold hover:scale-[1.02] transition-transform shadow-lg shadow-primary/20"
-        >
-          Follow your first channel
-        </Link>
-      </div>
-    );
-  }
-
   const loadMore = useCallback(async () => {
     if (isFetchingMore || !hasMore) return;
 
@@ -229,9 +209,9 @@ function Dashboard() {
                     : "bg-transparent border-transparent text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
                 }`}
               >
-                <img
-                  src={yc.thumbnailMedium}
-                  alt={yc.title}
+                <Avatar
+                  src={yc.thumbnailMedium || yc.thumbnailDefault}
+                  name={yc.title}
                   className="size-8 rounded-full border border-border/20 shadow-sm shrink-0 object-cover"
                 />
                 <span className="truncate">{yc.title}</span>

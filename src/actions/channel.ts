@@ -10,7 +10,7 @@ import { syncChannelVideosExhaustive } from "./sync";
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 export const fetchChannelByHandle = createServerFn({ method: "GET" })
-  .inputValidator((handle: string) => handle)
+  .validator((handle: string) => handle)
   .handler(async ({ data: handle }) => {
     if (!handle || handle.trim() === "" || handle.trim() === "@") return null;
 
@@ -35,7 +35,7 @@ export const fetchChannelByHandle = createServerFn({ method: "GET" })
             channelId: cached.channelId,
             uploadsPlaylistId: cached.uploadsPlaylistId,
           },
-        }).catch((err) =>
+        }).catch((err: unknown) =>
           console.error(`[CachedSync] Failed for ${cached.channelId}:`, err),
         );
       }
@@ -124,7 +124,7 @@ export const fetchChannelByHandle = createServerFn({ method: "GET" })
           channelId: result.id,
           uploadsPlaylistId: result.uploadsPlaylistId,
         },
-      }).catch((err) =>
+      }).catch((err: unknown) =>
         console.error(`[InitialSync] Failed for ${result.id}:`, err),
       );
 
@@ -136,7 +136,7 @@ export const fetchChannelByHandle = createServerFn({ method: "GET" })
   });
 
 export const fetchChannelById = createServerFn({ method: "GET" })
-  .inputValidator((id: string) => id)
+  .validator((id: string) => id)
   .handler(async ({ data: id }): Promise<YouTubeChannelDetails | null> => {
     if (!id) return null;
 

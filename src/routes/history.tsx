@@ -10,12 +10,17 @@ import { useState } from "react";
 import { getHistory, deleteHistoryItem, clearHistory } from "#/actions/history";
 import { getTimeAgo } from "#/lib/utils";
 import { authClient } from "#/lib/auth-client";
+import { getSession } from "#/lib/auth.functions";
 import UnauthorizedState from "#/components/UnauthorizedState";
+import VideoThumbnail from "#/components/VideoThumbnail";
 
 export const Route = createFileRoute("/history")({
   loader: async () => {
-    const history = await getHistory();
-    return { initialHistory: history || [] };
+    const [history, session] = await Promise.all([
+      getHistory(),
+      getSession(),
+    ]);
+    return { initialHistory: history || [], isLoggedIn: !!session?.user };
   },
   head: () => ({
     title: "History | Kivio",
@@ -57,13 +62,15 @@ function ErrorState({ error }: { error: any }) {
 }
 
 function RouteComponent() {
-  const { initialHistory } = Route.useLoaderData();
+  const { initialHistory, isLoggedIn } = Route.useLoaderData();
   const [history, setHistory] = useState(initialHistory);
   const [search, setSearch] = useState("");
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
 
-  if (isPending) {
+  const authenticated = isLoggedIn || !!session;
+
+  if (isPending && !isLoggedIn) {
     return (
       <div className="h-[calc(100vh-3rem)] flex flex-col items-center justify-center p-4">
         <IconLoader className="animate-spin text-primary" />
@@ -71,7 +78,7 @@ function RouteComponent() {
     );
   }
 
-  if (!session) {
+  if (!authenticated) {
     return (
       <UnauthorizedState
         title="Sign in to track history"
@@ -165,8 +172,9 @@ function RouteComponent() {
               >
                 {/* Thumbnail */}
                 <div className="relative w-full sm:w-56 aspect-video rounded-xl overflow-hidden shrink-0 bg-zinc-800 shadow-sm group-hover:shadow-md">
-                  <img
+                  <VideoThumbnail
                     src={video.thumbnail}
+                    videoId={video.videoId}
                     alt={video.title}
                     className="w-full h-full object-cover group-hover:scale-[1.02]"
                   />

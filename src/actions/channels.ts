@@ -1,8 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "#/db";
-import { channels, videos, youtubeChannels } from "#/db/schema";
-import { ensureSession } from "#/lib/auth.functions";
+import { channels, youtubeChannels } from "#/db/schema";
+import { getSession, ensureSession } from "#/lib/auth.functions";
 import { normalizeHandle } from "#/lib/utils";
 import { fetchChannelByHandle } from "./channel";
 import { mapDbVideoToYouTubeVideo } from "./videos";
@@ -11,8 +11,8 @@ import type { YouTubeVideo } from "#/types";
 export const getUserChannels = createServerFn({ method: "GET" }).handler(
   async () => {
     try {
-      const session = await ensureSession();
-      const userId = session.user.id;
+      const session = await getSession();
+      const userId = session?.user?.id;
       if (!userId) {
         return [];
       }
@@ -37,10 +37,13 @@ export const getUserChannels = createServerFn({ method: "GET" }).handler(
   },
 );
 
-import { subscribeToChannelWebhooks } from "./webhooks";
+import {
+  subscribeToChannelWebhooks,
+  unsubscribeFromChannelWebhooks,
+} from "./webhooks";
 
 export const addUserChannel = createServerFn({ method: "POST" })
-  .inputValidator((handle: string) => handle)
+  .validator((handle: string) => handle)
   .handler(async ({ data: handle }) => {
     try {
       const session = await ensureSession();
@@ -76,16 +79,47 @@ export const addUserChannel = createServerFn({ method: "POST" })
   });
 
 export const removeUserChannel = createServerFn({ method: "POST" })
-  .inputValidator((id: string) => id)
+  .validator((id: string) => id)
   .handler(async ({ data: id }) => {
     try {
       const session = await ensureSession();
       const userId = session.user.id;
       if (!userId) throw new Error("Unauthorized");
 
+      // 1. Find the channel record to determine the handle
+      const userChannel = await db.query.channels.findFirst({
+        where: and(eq(channels.id, id), eq(channels.userId, userId)),
+      });
+
+      if (!userChannel) {
+        return { success: false, error: "Channel not found" };
+      }
+
+      // 2. Delete the user follow record
       await db
         .delete(channels)
         .where(and(eq(channels.id, id), eq(channels.userId, userId)));
+
+      // 3. Check if any other user is still following this channel
+      const remainingFollower = await db.query.channels.findFirst({
+        where: eq(channels.handle, userChannel.handle),
+      });
+
+      // 4. If no one else follows this channel, unsubscribe from Google Hub
+      if (!remainingFollower) {
+        const yc = await db.query.youtubeChannels.findFirst({
+          where: eq(youtubeChannels.handle, userChannel.handle),
+        });
+
+        if (yc?.channelId) {
+          unsubscribeFromChannelWebhooks(yc.channelId).catch((err) =>
+            console.error(
+              `[WebhookUnsub] Error unsubscribing ${yc.channelId}:`,
+              err,
+            ),
+          );
+        }
+      }
 
       return { success: true };
     } catch (err: unknown) {
@@ -96,10 +130,15 @@ export const removeUserChannel = createServerFn({ method: "POST" })
 
 /** Videos stored for a channel, scoped to channels the signed-in user follows. */
 export const getVideosForChannelHandle = createServerFn({ method: "GET" })
-  .inputValidator((handle: string) => handle)
-  .handler(async ({ data: handle }) => {
-    const session = await ensureSession();
-    const userId = session.user.id;
+  .validator((input: string | { handle: string; isShort?: boolean }) => input)
+  .handler(async ({ data: input }) => {
+    const handle = typeof input === "string" ? input : input.handle;
+    const isShort = typeof input === "object" ? input.isShort : undefined;
+
+    const session = await getSession();
+    const userId = session?.user?.id;
+    if (!userId) return [];
+
     const cleanHandle = normalizeHandle(handle);
     if (!cleanHandle) return [];
 
@@ -116,16 +155,37 @@ export const getVideosForChannelHandle = createServerFn({ method: "GET" })
     });
     if (!yc) return [];
 
-    const vids = await db.query.videos.findMany({
-      where: eq(videos.channelId, yc.channelId),
-      orderBy: [
-        desc(
-          sql`(${videos.rawVideo} -> 'snippet' ->> 'publishedAt')::timestamptz`,
-        ),
-      ],
-    });
+    const shortFilter =
+      isShort === true
+        ? sql`AND v."is_short" IS TRUE`
+        : isShort === false
+          ? sql`AND (v."is_short" IS NOT TRUE OR v."is_short" IS NULL)`
+          : sql``;
 
-    return vids
+    const result = await db.execute(sql`
+      SELECT 
+        v."id",
+        v."channel_id" as "channelId",
+        v."duration_seconds" as "durationSeconds",
+        v."is_short" as "isShort",
+        coalesce(v."raw_video" -> 'snippet' ->> 'title', v."raw_playlist_item" -> 'snippet' ->> 'title', v."id") as "title",
+        coalesce(v."raw_video" -> 'snippet' ->> 'publishedAt', v."raw_playlist_item" -> 'contentDetails' ->> 'videoPublishedAt') as "publishedAt",
+        coalesce(
+          v."raw_video" -> 'snippet' -> 'thumbnails' -> 'high' ->> 'url',
+          v."raw_video" -> 'snippet' -> 'thumbnails' -> 'medium' ->> 'url',
+          v."raw_playlist_item" -> 'snippet' -> 'thumbnails' -> 'high' ->> 'url',
+          ''
+        ) as "thumbnail",
+        v."raw_video" -> 'contentDetails' ->> 'duration' as "rawDuration",
+        v."raw_video" -> 'statistics' ->> 'viewCount' as "viewCount"
+      FROM "videos" v
+      WHERE v."channel_id" = ${yc.channelId}
+      ${shortFilter}
+      ORDER BY (v."raw_video" -> 'snippet' ->> 'publishedAt') DESC
+      LIMIT 36;
+    `);
+
+    return (result.rows as any[])
       .map((v) =>
         mapDbVideoToYouTubeVideo(v, {
           title: yc.title,
@@ -136,7 +196,7 @@ export const getVideosForChannelHandle = createServerFn({ method: "GET" })
   });
 
 export const updateUserChannel = createServerFn({ method: "POST" })
-  .inputValidator((input: { id: string; handle: string }) => input)
+  .validator((input: { id: string; handle: string }) => input)
   .handler(async ({ data: { id, handle } }) => {
     try {
       const session = await ensureSession();

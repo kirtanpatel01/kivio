@@ -2,6 +2,7 @@ import { IconPlayerPause, IconPlayerPlay } from "@tabler/icons-react";
 import type { YouTubeVideo } from "#/types";
 import { formatCount } from "#/lib/utils";
 import { useEffect, useRef, useState } from "react";
+import Avatar from "#/components/Avatar";
 
 interface ShortVideoProps {
   video: YouTubeVideo;
@@ -94,13 +95,11 @@ export default function ShortVideo({ video, isActive }: ShortVideoProps) {
           <div className="flex flex-col gap-3">
             {/* Channel Info */}
             <div className="flex items-center gap-3">
-              {video.channelAvatar && (
-                <img
-                  src={video.channelAvatar}
-                  alt={video.channelTitle}
-                  className="size-10 rounded-full border border-white/20"
-                />
-              )}
+              <Avatar
+                src={video.channelAvatar}
+                name={video.channelTitle}
+                className="size-10 rounded-full border border-white/20 object-cover"
+              />
               <div className="flex flex-col">
                 <span className="font-bold text-sm tracking-wide">
                   @{video.channelTitle}

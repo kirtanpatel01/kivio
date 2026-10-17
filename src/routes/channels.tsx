@@ -5,6 +5,7 @@ import { getUserChannels, getVideosForChannelHandle } from "#/actions/channels";
 import { getWatchedVideoIds } from "#/actions/history";
 import { fetchChannelByHandle } from "#/actions/channel";
 import { fetchPlaylistsByHandle } from "#/actions/playlists";
+import { getSession } from "#/lib/auth.functions";
 import ChannelDetails from "#/components/channels/channel-details";
 import ChannelList from "#/components/channels/channel-list";
 import UnauthorizedState from "#/components/UnauthorizedState";
@@ -23,7 +24,10 @@ export const Route = createFileRoute("/channels")({
       .parse(search),
   loaderDeps: ({ search: { handle, tab } }) => ({ handle, tab }),
   loader: async ({ deps: { handle, tab } }) => {
-    const channels = await getUserChannels();
+    const [channels, session] = await Promise.all([
+      getUserChannels(),
+      getSession(),
+    ]);
 
     if (!handle && channels.length > 0) {
       throw redirect({
@@ -43,12 +47,19 @@ export const Route = createFileRoute("/channels")({
         channelVideos: [],
         playlists: [],
         watchedIds: [],
+        isLoggedIn: !!session?.user,
       };
     }
     const [details, channelVideos, playlists, watchedIds] = await Promise.all([
       fetchChannelByHandle({ data: handle }),
-      getVideosForChannelHandle({ data: handle }),
-      fetchPlaylistsByHandle({ data: handle }),
+      tab !== "playlists"
+        ? getVideosForChannelHandle({
+            data: { handle, isShort: tab === "shorts" },
+          })
+        : Promise.resolve([]),
+      tab === "playlists"
+        ? fetchPlaylistsByHandle({ data: handle })
+        : Promise.resolve([]),
       getWatchedVideoIds(),
     ]);
     return {
@@ -57,6 +68,7 @@ export const Route = createFileRoute("/channels")({
       channelVideos,
       playlists: playlists ?? [],
       watchedIds: watchedIds ?? [],
+      isLoggedIn: !!session?.user,
     };
   },
   head: ({ loaderData }) => ({
@@ -85,9 +97,11 @@ function ErrorState({ error }: { error: unknown }) {
 
 function RouteComponent() {
   const { data: session, isPending } = authClient.useSession();
-  const { channels } = Route.useLoaderData();
+  const { channels, isLoggedIn } = Route.useLoaderData();
 
-  if (isPending) {
+  const authenticated = isLoggedIn || !!session;
+
+  if (isPending && !isLoggedIn) {
     return (
       <div className="h-[calc(100vh-3rem)] flex flex-col items-center justify-center p-4 text-center space-y-4">
         <IconLoader className="animate-spin text-primary" />
@@ -95,7 +109,7 @@ function RouteComponent() {
     );
   }
 
-  if (!session) {
+  if (!authenticated) {
     return (
       <UnauthorizedState
         title="Sign in to save channels"

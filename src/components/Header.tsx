@@ -35,9 +35,10 @@ export default function Header() {
         <h2 className="tracking-tight">
           <Link
             to="/"
-            className="flex items-center gap-2 text-lg sm:text-2xl font-extrabold text-primary group"
+            className="flex items-center gap-2 text-lg sm:text-2xl font-extrabold group"
           >
-            <img src="/logo.png" alt="Kivio" className="w-8 h-10" />
+            <img src="/logo.png" alt="Kivio" className="h-12" />
+            <h1 className="text-3xl font-bold">Kivio</h1>
           </Link>
         </h2>
 

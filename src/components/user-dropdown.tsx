@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { IconLogout } from "@tabler/icons-react";
 import LoginBtn from "./login-btn";
+import Avatar from "./Avatar";
 import { authClient } from "#/lib/auth-client";
 
 function UserDropdown() {
@@ -37,12 +38,12 @@ function UserDropdown() {
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setOpen((prev) => !prev)}
-            className="cursor-pointer rounded-full ring-2 ring-transparent hover:ring-primary/40"
+            className="cursor-pointer rounded-full ring-2 ring-transparent hover:ring-primary/40 overflow-hidden flex items-center justify-center"
           >
-            <img
-              src={user?.image || "/avatar.png"}
-              alt={user?.name || "User"}
-              className="w-8 h-8 rounded-full"
+            <Avatar
+              src={user?.image}
+              name={user?.name}
+              className="w-8 h-8 rounded-full object-cover"
             />
           </button>
 
@@ -57,10 +58,10 @@ function UserDropdown() {
               >
                 {/* User Info */}
                 <div className="flex items-center gap-3 p-4 border-b border-border">
-                  <img
-                    src={user?.image || "/avatar.png"}
-                    alt={user?.name || "User"}
-                    className="w-10 h-10 rounded-full shrink-0"
+                  <Avatar
+                    src={user?.image}
+                    name={user?.name}
+                    className="w-10 h-10 rounded-full shrink-0 object-cover"
                   />
                   <div className="min-w-0">
                     <p className="text-sm font-semibold truncate">

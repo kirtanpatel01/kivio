@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { recordHistory } from "#/actions/history";
 import type { YouTubeVideo } from "#/types";
+import VideoThumbnail from "#/components/VideoThumbnail";
 
 interface PlaylistVideoCardProps {
   video: YouTubeVideo;
@@ -39,8 +40,9 @@ export default function PlaylistVideoCard({
       }}
     >
       <div className="relative w-28 aspect-video rounded-lg overflow-hidden shrink-0 bg-secondary/20">
-        <img
+        <VideoThumbnail
           src={video.thumbnail}
+          videoId={video.id}
           alt={video.title}
           className="w-full h-full object-cover"
         />

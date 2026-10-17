@@ -1,18 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
-import { desc, eq, inArray, sql, ilike, or, and } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "#/db";
-import { channels, videos } from "#/db/schema";
-import { ensureSession } from "#/lib/auth.functions";
+import { channels } from "#/db/schema";
+import { getSession } from "#/lib/auth.functions";
 import type { YouTubeVideo } from "#/types";
 import { mapDbVideoToYouTubeVideo } from "./videos";
 
 export const fetchFeedForUser = createServerFn({ method: "GET" })
-  .inputValidator(
+  .validator(
     (data?: { page?: number; limit?: number; q?: string }) => data,
   )
   .handler(async ({ data }) => {
-    const session = await ensureSession();
-    const userId = session.user.id;
+    const session = await getSession();
+    const userId = session?.user?.id;
+    if (!userId) return { videos: [], hasMore: false };
+
     const page = data?.page ?? 0;
     const limit = data?.limit ?? 20;
     const q = data?.q?.trim();
@@ -27,64 +29,62 @@ export const fetchFeedForUser = createServerFn({ method: "GET" })
       .map((uc) => uc.youtubeChannel?.channelId)
       .filter(Boolean) as string[];
 
-    const conditions = [
-      inArray(videos.channelId, channelIds),
-      sql`(${videos.isShort} IS NOT TRUE OR ${videos.isShort} IS NULL)`,
-    ];
+    const searchFilter = q
+      ? sql`AND (v."raw_video" -> 'snippet' ->> 'title' ILIKE ${`%${q}%`} OR v."raw_playlist_item" -> 'snippet' ->> 'title' ILIKE ${`%${q}%`})`
+      : sql``;
 
-    if (q) {
-      conditions.push(
-        or(
-          ilike(sql`${videos.rawVideo} -> 'snippet' ->> 'title'`, `%${q}%`),
-          ilike(
-            sql`${videos.rawPlaylistItem} -> 'snippet' ->> 'title'`,
-            `%${q}%`,
-          ),
-        ) as any,
-      );
-    }
+    const channelList = sql.join(
+      channelIds.map((id) => sql`${id}`),
+      sql`, `,
+    );
 
-    const result = await db.query.videos.findMany({
-      where: and(...conditions),
-      with: {
-        youtubeChannel: true,
-      },
-      orderBy: [
-        desc(
-          sql`(${videos.rawVideo} -> 'snippet' ->> 'publishedAt')::timestamptz`,
-        ),
-      ],
-      limit: limit + 1,
-      offset: page * limit,
-    });
+    const result = await db.execute(sql`
+      SELECT 
+        v."id",
+        v."channel_id" as "channelId",
+        v."duration_seconds" as "durationSeconds",
+        v."is_short" as "isShort",
+        coalesce(v."raw_video" -> 'snippet' ->> 'title', v."raw_playlist_item" -> 'snippet' ->> 'title', v."id") as "title",
+        coalesce(v."raw_video" -> 'snippet' ->> 'publishedAt', v."raw_playlist_item" -> 'contentDetails' ->> 'videoPublishedAt') as "publishedAt",
+        coalesce(
+          v."raw_video" -> 'snippet' -> 'thumbnails' -> 'high' ->> 'url',
+          v."raw_video" -> 'snippet' -> 'thumbnails' -> 'medium' ->> 'url',
+          v."raw_playlist_item" -> 'snippet' -> 'thumbnails' -> 'high' ->> 'url',
+          ''
+        ) as "thumbnail",
+        v."raw_video" -> 'contentDetails' ->> 'duration' as "rawDuration",
+        v."raw_video" -> 'statistics' ->> 'viewCount' as "viewCount",
+        yc."title" as "channelTitle",
+        yc."thumbnail_medium" as "channelAvatar"
+      FROM "videos" v
+      LEFT JOIN "youtube_channels" yc ON v."channel_id" = yc."channel_id"
+      WHERE v."channel_id" IN (${channelList})
+        AND (v."is_short" IS NOT TRUE OR v."is_short" IS NULL)
+        ${searchFilter}
+      ORDER BY (v."raw_video" -> 'snippet' ->> 'publishedAt') DESC
+      LIMIT ${limit + 1}
+      OFFSET ${page * limit};
+    `);
 
-    const hasMore = result.length > limit;
-    const feedVideos = result
+    const rows = result.rows as any[];
+    const hasMore = rows.length > limit;
+    const feedVideos = rows
       .slice(0, limit)
-      .map((v) => {
-        const uc = userChannels.find(
-          (uc) => uc.youtubeChannel?.channelId === v.channelId,
-        );
-        const channelInfo = uc?.youtubeChannel
-          ? {
-              title: uc.youtubeChannel.title,
-              thumbnailMedium: uc.youtubeChannel.thumbnailMedium,
-            }
-          : undefined;
-        return mapDbVideoToYouTubeVideo(v, channelInfo);
-      })
+      .map((v) => mapDbVideoToYouTubeVideo(v))
       .filter((v): v is YouTubeVideo => v !== null);
 
     return { videos: feedVideos, hasMore };
   });
 
 export const fetchShortsForUser = createServerFn({ method: "GET" })
-  .inputValidator(
+  .validator(
     (data?: { page?: number; limit?: number; currentVideoId?: string }) => data,
   )
   .handler(async ({ data }) => {
-    const session = await ensureSession();
-    const userId = session.user.id;
+    const session = await getSession();
+    const userId = session?.user?.id;
+    if (!userId) return { videos: [], hasMore: false };
+
     const page = data?.page ?? 0;
     const limit = data?.limit ?? 10;
     const currentVideoId = data?.currentVideoId;
@@ -100,47 +100,79 @@ export const fetchShortsForUser = createServerFn({ method: "GET" })
       .map((uc) => uc.youtubeChannel?.channelId)
       .filter(Boolean) as string[];
 
-    let result = await db.query.videos.findMany({
-      where: sql`${inArray(videos.channelId, channelIds)} AND ${videos.isShort} IS TRUE`,
-      with: { youtubeChannel: true },
-      orderBy: [
-        desc(
-          sql`(${videos.rawVideo} -> 'snippet' ->> 'publishedAt')::timestamptz`,
-        ),
-      ],
-      limit: limit + 1,
-      offset: page * limit,
-    });
+    const channelList = sql.join(
+      channelIds.map((id) => sql`${id}`),
+      sql`, `,
+    );
+
+    let rows = (
+      await db.execute(sql`
+        SELECT 
+          v."id",
+          v."channel_id" as "channelId",
+          v."duration_seconds" as "durationSeconds",
+          v."is_short" as "isShort",
+          coalesce(v."raw_video" -> 'snippet' ->> 'title', v."raw_playlist_item" -> 'snippet' ->> 'title', v."id") as "title",
+          coalesce(v."raw_video" -> 'snippet' ->> 'publishedAt', v."raw_playlist_item" -> 'contentDetails' ->> 'videoPublishedAt') as "publishedAt",
+          coalesce(
+            v."raw_video" -> 'snippet' -> 'thumbnails' -> 'high' ->> 'url',
+            v."raw_video" -> 'snippet' -> 'thumbnails' -> 'medium' ->> 'url',
+            v."raw_playlist_item" -> 'snippet' -> 'thumbnails' -> 'high' ->> 'url',
+            ''
+          ) as "thumbnail",
+          v."raw_video" -> 'contentDetails' ->> 'duration' as "rawDuration",
+          v."raw_video" -> 'statistics' ->> 'viewCount' as "viewCount",
+          yc."title" as "channelTitle",
+          yc."thumbnail_medium" as "channelAvatar"
+        FROM "videos" v
+        LEFT JOIN "youtube_channels" yc ON v."channel_id" = yc."channel_id"
+        WHERE v."channel_id" IN (${channelList})
+          AND v."is_short" IS TRUE
+        ORDER BY (v."raw_video" -> 'snippet' ->> 'publishedAt') DESC
+        LIMIT ${limit + 1}
+        OFFSET ${page * limit};
+      `)
+    ).rows as any[];
 
     if (
       page === 0 &&
       currentVideoId &&
-      !result.some((v) => v.id === currentVideoId)
+      !rows.some((v) => v.id === currentVideoId)
     ) {
-      const specific = await db.query.videos.findFirst({
-        where: eq(videos.id, currentVideoId),
-        with: { youtubeChannel: true },
-      });
+      const specific = (
+        await db.execute(sql`
+          SELECT 
+            v."id",
+            v."channel_id" as "channelId",
+            v."duration_seconds" as "durationSeconds",
+            v."is_short" as "isShort",
+            coalesce(v."raw_video" -> 'snippet' ->> 'title', v."raw_playlist_item" -> 'snippet' ->> 'title', v."id") as "title",
+            coalesce(v."raw_video" -> 'snippet' ->> 'publishedAt', v."raw_playlist_item" -> 'contentDetails' ->> 'videoPublishedAt') as "publishedAt",
+            coalesce(
+              v."raw_video" -> 'snippet' -> 'thumbnails' -> 'high' ->> 'url',
+              v."raw_video" -> 'snippet' -> 'thumbnails' -> 'medium' ->> 'url',
+              v."raw_playlist_item" -> 'snippet' -> 'thumbnails' -> 'high' ->> 'url',
+              ''
+            ) as "thumbnail",
+            v."raw_video" -> 'contentDetails' ->> 'duration' as "rawDuration",
+            v."raw_video" -> 'statistics' ->> 'viewCount' as "viewCount",
+            yc."title" as "channelTitle",
+            yc."thumbnail_medium" as "channelAvatar"
+          FROM "videos" v
+          LEFT JOIN "youtube_channels" yc ON v."channel_id" = yc."channel_id"
+          WHERE v."id" = ${currentVideoId}
+          LIMIT 1;
+        `)
+      ).rows[0] as any;
       if (specific) {
-        result = [specific, ...result];
+        rows = [specific, ...rows];
       }
     }
 
-    const hasMore = result.length > limit;
-    const feedVideos = result
+    const hasMore = rows.length > limit;
+    const feedVideos = rows
       .slice(0, limit)
-      .map((v) => {
-        const uc = userChannels.find(
-          (uc) => uc.youtubeChannel?.channelId === v.channelId,
-        );
-        const channelInfo = uc?.youtubeChannel
-          ? {
-              title: uc.youtubeChannel.title,
-              thumbnailMedium: uc.youtubeChannel.thumbnailMedium,
-            }
-          : undefined;
-        return mapDbVideoToYouTubeVideo(v, channelInfo);
-      })
+      .map((v) => mapDbVideoToYouTubeVideo(v))
       .filter((v): v is YouTubeVideo => v !== null);
 
     return { videos: feedVideos, hasMore };

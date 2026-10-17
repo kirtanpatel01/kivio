@@ -3,6 +3,7 @@ import { recordHistory } from "#/actions/history";
 import { IconHistory } from "@tabler/icons-react";
 import { getTimeAgo } from "#/lib/utils";
 import type { YouTubeVideo } from "#/types";
+import VideoThumbnail from "#/components/VideoThumbnail";
 
 interface SuggestionCardProps {
   video: YouTubeVideo;
@@ -33,8 +34,9 @@ export default function SuggestionCard({
       <div className="group flex gap-3 cursor-pointer p-2 rounded-xl hover:bg-secondary/40 border border-transparent hover:border-border/10">
         {/* Compact Thumbnail */}
         <div className="relative w-40 aspect-video rounded-lg overflow-hidden shrink-0 bg-secondary/20">
-          <img
+          <VideoThumbnail
             src={video.thumbnail}
+            videoId={video.id}
             alt={video.title}
             className="w-full h-full object-cover group-hover:scale-105"
           />

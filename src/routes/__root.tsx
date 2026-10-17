@@ -18,6 +18,10 @@ export const Route = createRootRoute({
     title: "Kivio - Your Personal YouTube Feed",
     meta: [
       {
+        name: "referrer",
+        content: "no-referrer",
+      },
+      {
         charSet: "utf-8",
       },
       {
@@ -95,6 +99,7 @@ function PageNotFound() {
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "../lib/query";
+import TopProgressBar from "../components/TopProgressBar";
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   const isShorts = useRouterState({
@@ -108,6 +113,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body className="font-sans antialiased overflow-y-hidden">
+        <TopProgressBar />
         <QueryClientProvider client={queryClient}>
           <Header />
           <main

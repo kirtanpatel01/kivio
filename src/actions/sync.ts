@@ -11,7 +11,7 @@ import { parseISO8601DurationToSeconds } from "#/lib/utils";
  * This function will keep looping until it finds the very first video ever uploaded.
  */
 export const syncChannelVideosExhaustive = createServerFn({ method: "POST" })
-  .inputValidator(
+  .validator(
     (data: { channelId: string; uploadsPlaylistId: string }) => data,
   )
   .handler(async ({ data }) => {

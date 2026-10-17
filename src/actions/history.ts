@@ -2,10 +2,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { db } from "#/db";
 import { history } from "#/db/schema";
 import { eq, and, desc } from "drizzle-orm";
-import { ensureSession } from "#/lib/auth.functions";
+import { getSession, ensureSession } from "#/lib/auth.functions";
 
 export const recordHistory = createServerFn({ method: "POST" })
-  .inputValidator(
+  .validator(
     (data: {
       videoId: string;
       title: string;
@@ -55,8 +55,8 @@ export const recordHistory = createServerFn({ method: "POST" })
 export const getHistory = createServerFn({ method: "GET" }).handler(
   async () => {
     try {
-      const session = await ensureSession();
-      const userId = session.user.id;
+      const session = await getSession();
+      const userId = session?.user?.id;
       if (!userId) return [];
 
       return await db.query.history.findMany({
@@ -73,8 +73,8 @@ export const getHistory = createServerFn({ method: "GET" }).handler(
 export const getWatchedVideoIds = createServerFn({ method: "GET" }).handler(
   async () => {
     try {
-      const session = await ensureSession();
-      const userId = session.user.id;
+      const session = await getSession();
+      const userId = session?.user?.id;
       if (!userId) return [];
 
       const historyItems = await db.query.history.findMany({
@@ -90,7 +90,7 @@ export const getWatchedVideoIds = createServerFn({ method: "GET" }).handler(
 );
 
 export const deleteHistoryItem = createServerFn({ method: "POST" })
-  .inputValidator((id: string) => id)
+  .validator((id: string) => id)
   .handler(async ({ data: id }) => {
     try {
       const session = await ensureSession();

@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import { desc, eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { db } from "#/db";
-import { videos } from "#/db/schema";
 import { getEnvVar } from "#/lib/server-utils";
 import { parseISO8601Duration } from "#/lib/utils";
 import type { YouTubeVideo } from "#/types";
@@ -11,6 +10,32 @@ export function mapDbVideoToYouTubeVideo(
   channelInfo?: { title: string; thumbnailMedium: string },
 ): YouTubeVideo | null {
   if (!v) return null;
+
+  // 0. Fast path: if video already has lightweight projected fields from SQL
+  if (v.title && v.thumbnail !== undefined && (v.publishedAt || v.createdAt)) {
+    const duration = v.rawDuration
+      ? parseISO8601Duration(v.rawDuration)
+      : typeof v.durationSeconds === "number"
+        ? `${Math.floor(v.durationSeconds / 60)}:${(v.durationSeconds % 60).toString().padStart(2, "0")}`
+        : null;
+
+    return {
+      id: v.id,
+      title: v.title,
+      thumbnail: v.thumbnail,
+      publishedAt: (v.publishedAt ?? v.createdAt) as string,
+      duration,
+      description: v.description,
+      viewCount: v.viewCount ? String(v.viewCount) : undefined,
+      likeCount: v.likeCount ? String(v.likeCount) : undefined,
+      channelId: v.channelId,
+      channelTitle: channelInfo?.title ?? v.channelTitle ?? v.youtubeChannel?.title ?? "",
+      channelAvatar:
+        channelInfo?.thumbnailMedium ?? v.channelAvatar ?? v.youtubeChannel?.thumbnailMedium ?? "",
+      uploadsPlaylistId: v.uploadsPlaylistId ?? v.youtubeChannel?.uploadsPlaylistId,
+      isShort: v.isShort ?? false,
+    } as YouTubeVideo;
+  }
 
   // 1. Ensure we have objects, not strings (defensive against driver quirks)
   const rawVideo =
@@ -71,30 +96,39 @@ export function mapDbVideoToYouTubeVideo(
 }
 
 export const getSuggestedVideos = createServerFn({ method: "GET" })
-  .inputValidator((data: { channelId: string }) => data)
+  .validator((data: { channelId: string }) => data)
   .handler(async ({ data }) => {
     const { channelId } = data;
 
-    const result = await db.query.videos.findMany({
-      where: eq(videos.channelId, channelId),
-      with: {
-        youtubeChannel: true,
-      },
-      orderBy: [
-        desc(
-          sql`(${videos.rawVideo} -> 'snippet' ->> 'publishedAt')::timestamptz`,
-        ),
-      ],
-      limit: 12,
-    });
+    const result = await db.execute(sql`
+      SELECT 
+        v."id",
+        v."channel_id" as "channelId",
+        v."duration_seconds" as "durationSeconds",
+        v."is_short" as "isShort",
+        coalesce(v."raw_video" -> 'snippet' ->> 'title', v."raw_playlist_item" -> 'snippet' ->> 'title', v."id") as "title",
+        coalesce(v."raw_video" -> 'snippet' ->> 'publishedAt', v."raw_playlist_item" -> 'contentDetails' ->> 'videoPublishedAt') as "publishedAt",
+        coalesce(
+          v."raw_video" -> 'snippet' -> 'thumbnails' -> 'high' ->> 'url',
+          v."raw_video" -> 'snippet' -> 'thumbnails' -> 'medium' ->> 'url',
+          v."raw_playlist_item" -> 'snippet' -> 'thumbnails' -> 'high' ->> 'url',
+          ''
+        ) as "thumbnail",
+        v."raw_video" -> 'contentDetails' ->> 'duration' as "rawDuration",
+        v."raw_video" -> 'statistics' ->> 'viewCount' as "viewCount"
+      FROM "videos" v
+      WHERE v."channel_id" = ${channelId}
+      ORDER BY (v."raw_video" -> 'snippet' ->> 'publishedAt') DESC
+      LIMIT 12;
+    `);
 
-    return result
+    return (result.rows as any[])
       .map((v) => mapDbVideoToYouTubeVideo(v))
       .filter((v): v is YouTubeVideo => v !== null);
   });
 
 export const fetchVideoDetails = createServerFn({ method: "GET" })
-  .inputValidator((videoId: string) => videoId)
+  .validator((videoId: string) => videoId)
   .handler(async ({ data: videoId }): Promise<YouTubeVideo | null> => {
     const apiKey = getEnvVar("YOUTUBE_API_KEY")?.trim();
     if (!apiKey) throw new Error("YouTube API Key not configured.");

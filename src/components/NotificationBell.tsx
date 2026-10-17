@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { IconBell, IconCheck, IconPlayerPlay } from "@tabler/icons-react";
 import {
   getNotifications,
@@ -9,6 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { cn, formatDate } from "#/lib/utils";
 import { motion, AnimatePresence } from "motion/react";
+import Avatar from "#/components/Avatar";
 
 export default function NotificationBell() {
   const queryClient = useQueryClient();
@@ -19,31 +20,29 @@ export default function NotificationBell() {
     queryFn: () => getNotifications(),
   });
 
-  // REAL REAL-TIME LISTENER! 🌪️🌪️🌪️
-  useState(() => {
-    if (typeof window !== "undefined") {
-      const eventSource = new EventSource("/api/notifications/stream");
+  // Real-time notification updates via SSE
+  useEffect(() => {
+    const eventSource = new EventSource("/api/notifications/stream");
 
-      eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === "refresh") {
-            queryClient.invalidateQueries({ queryKey: ["notifications"] });
-          }
-        } catch (e) {
-          // Heartbeats and empty messages
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "refresh") {
+          queryClient.invalidateQueries({ queryKey: ["notifications"] });
         }
-      };
+      } catch (e) {
+        // Heartbeats and empty messages
+      }
+    };
 
-      eventSource.onerror = () => {
-        eventSource.close();
-      };
+    eventSource.onerror = () => {
+      eventSource.close();
+    };
 
-      // Cleanup
-      window.addEventListener("beforeunload", () => eventSource.close());
-    }
-    return null;
-  });
+    return () => {
+      eventSource.close();
+    };
+  }, [queryClient]);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
@@ -156,13 +155,11 @@ export default function NotificationBell() {
                           <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full" />
                         )}
 
-                        <div className="relative shrink-0 w-12 h-12 rounded-full overflow-hidden border border-border/40 bg-secondary/20">
-                          <img
-                            src={n.channelAvatar}
-                            alt={n.channelTitle}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
+                        <Avatar
+                          src={n.channelAvatar}
+                          name={n.channelTitle}
+                          className="relative shrink-0 w-12 h-12 rounded-full object-cover border border-border/40 bg-secondary/20"
+                        />
 
                         <div className="flex-1 min-w-0 flex flex-col gap-1">
                           <p

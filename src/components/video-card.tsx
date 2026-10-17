@@ -2,6 +2,8 @@ import { recordHistory } from "#/actions/history";
 import { IconHistory } from "@tabler/icons-react";
 import type { YouTubeVideo } from "#/types";
 import { getTimeAgo } from "#/lib/utils";
+import Avatar from "#/components/Avatar";
+import VideoThumbnail from "#/components/VideoThumbnail";
 
 function VideoCard({
   video,
@@ -34,8 +36,9 @@ function VideoCard({
 
       {/* Thumbnail Container */}
       <div className="relative w-full aspect-video overflow-hidden rounded-2xl bg-secondary/20">
-        <img
+        <VideoThumbnail
           src={video.thumbnail}
+          videoId={video.id}
           alt={video.title}
           className="w-full h-full object-cover group-hover:scale-[1.01] z-20 transition-all duration-500"
         />
@@ -53,9 +56,9 @@ function VideoCard({
 
       {/* Info Section */}
       <div className="w-full flex gap-3 px-1 z-20">
-        <img
+        <Avatar
           src={video.channelAvatar}
-          alt={video.channelTitle}
+          name={video.channelTitle}
           className="size-10 rounded-full shrink-0 object-cover border border-border/10 bg-secondary/20"
         />
         <div className="w-full flex flex-col gap-1 overflow-hidden">

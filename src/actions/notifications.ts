@@ -2,13 +2,13 @@ import { createServerFn } from "@tanstack/react-start";
 import { and, desc, eq, lt } from "drizzle-orm";
 import { db } from "#/db";
 import { notifications } from "#/db/schema";
-import { ensureSession } from "#/lib/auth.functions";
+import { getSession, ensureSession } from "#/lib/auth.functions";
 
 export const getNotifications = createServerFn({ method: "GET" }).handler(
   async () => {
     try {
-      const session = await ensureSession();
-      const userId = session.user.id;
+      const session = await getSession();
+      const userId = session?.user?.id;
       if (!userId) return [];
 
       const result = await db.query.notifications.findMany({
@@ -26,7 +26,7 @@ export const getNotifications = createServerFn({ method: "GET" }).handler(
 );
 
 export const markAsRead = createServerFn({ method: "POST" })
-  .inputValidator((id: string) => id)
+  .validator((id: string) => id)
   .handler(async ({ data: id }) => {
     try {
       const session = await ensureSession();

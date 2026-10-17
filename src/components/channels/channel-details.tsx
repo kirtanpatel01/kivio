@@ -10,6 +10,8 @@ import {
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import VideoCard from "#/components/video-card";
+import Avatar from "#/components/Avatar";
+import VideoThumbnail from "#/components/VideoThumbnail";
 import { formatCount, formatDate } from "#/lib/utils";
 import type {
   YouTubeChannelDetails,
@@ -86,10 +88,14 @@ export default function ChannelDetails() {
       <header className="shrink-0 border-b border-border/60 bg-background/80 backdrop-blur-sm px-4 py-3 sm:px-6">
         <div className="max-w-[1600px] mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
           <div className="flex items-center gap-3 min-w-0">
-            <img
-              src={details.thumbnails.high.url}
-              alt=""
-              className="size-14 sm:size-16 rounded-full border border-border/50 shrink-0 object-cover"
+            <Avatar
+              src={
+                details.thumbnails.high?.url ||
+                details.thumbnails.medium?.url ||
+                details.thumbnails.default?.url
+              }
+              name={details.title}
+              className="size-14 sm:size-16 rounded-full border border-border/50 shrink-0 object-cover text-lg font-bold"
             />
             <div className="min-w-0 flex-1">
               <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate">
@@ -255,7 +261,7 @@ export default function ChannelDetails() {
                       className="w-full group cursor-pointer flex flex-col gap-3 hover:scale-[1.01] transition-transform duration-300"
                     >
                       <div className="relative w-full aspect-video overflow-hidden rounded-2xl bg-secondary/20">
-                        <img
+                        <VideoThumbnail
                           src={playlist.thumbnail}
                           alt={playlist.title}
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"

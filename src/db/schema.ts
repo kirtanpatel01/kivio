@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -155,7 +155,13 @@ export const videos = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [index("videos_channelId_idx").on(table.channelId)],
+  (table) => [
+    index("videos_channelId_idx").on(table.channelId),
+    index("videos_channel_pub_text_idx").on(
+      table.channelId,
+      sql`(${table.rawVideo} -> 'snippet' ->> 'publishedAt') desc`,
+    ),
+  ],
 );
 
 export const playlists = pgTable(

@@ -7,7 +7,7 @@ import { playlists } from "#/db/schema";
 import { eq, sql } from "drizzle-orm";
 
 export const fetchPlaylistsByHandle = createServerFn({ method: "GET" })
-  .inputValidator((handle: string) => handle)
+  .validator((handle: string) => handle)
   .handler(async ({ data: handle }): Promise<YouTubePlaylist[]> => {
     // 1. Resolve handle to channel details to get channelId
     const channel = await fetchChannelByHandle({ data: handle });
@@ -111,7 +111,7 @@ export const fetchPlaylistsByHandle = createServerFn({ method: "GET" })
   });
 
 export const fetchPlaylistVideos = createServerFn({ method: "GET" })
-  .inputValidator((playlistId: string) => playlistId)
+  .validator((playlistId: string) => playlistId)
   .handler(async ({ data: playlistId }): Promise<YouTubeVideo[]> => {
     const apiKey = getEnvVar("YOUTUBE_API_KEY")?.trim();
     if (!apiKey) throw new Error("YouTube API Key not configured.");
@@ -146,7 +146,7 @@ export const fetchPlaylistVideos = createServerFn({ method: "GET" })
   });
 
 export const fetchPlaylistById = createServerFn({ method: "GET" })
-  .inputValidator((playlistId: string) => playlistId)
+  .validator((playlistId: string) => playlistId)
   .handler(async ({ data: id }): Promise<YouTubePlaylist | null> => {
     // Try DB first
     const cached = await db.query.playlists.findFirst({

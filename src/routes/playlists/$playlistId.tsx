@@ -2,6 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { fetchPlaylistById, fetchPlaylistVideos } from "#/actions/playlists";
 import { fetchChannelById } from "#/actions/channel";
 import VideoCard from "#/components/video-card";
+import Avatar from "#/components/Avatar";
+import VideoThumbnail from "#/components/VideoThumbnail";
 import { IconPlaylist, IconChevronLeft } from "@tabler/icons-react";
 import { formatDate } from "#/lib/utils";
 
@@ -72,7 +74,7 @@ function PlaylistPage() {
 
           <div className="flex flex-col md:flex-row gap-8 items-start">
             <div className="relative w-full md:w-80 aspect-video rounded-2xl overflow-hidden shadow-2xl shrink-0">
-              <img
+              <VideoThumbnail
                 src={playlist.thumbnail}
                 alt={playlist.title}
                 className="w-full h-full object-cover"
@@ -85,9 +87,9 @@ function PlaylistPage() {
             <div className="flex-1 flex flex-col gap-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-3">
-                  <img
+                  <Avatar
                     src={Route.useLoaderData().channelAvatar}
-                    alt="Channel Avatar"
+                    name={playlist.title}
                     className="w-6 h-6 sm:w-8 sm:h-8 rounded-full object-cover border border-white/10 ring-2 ring-white/5"
                   />
                   <h1 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight">
