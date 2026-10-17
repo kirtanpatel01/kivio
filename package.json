@@ -9,30 +9,34 @@
     "dev": "vite dev --port 3000",
     "build": "vite build",
     "preview": "vite preview",
+    "deploy": "pnpm run build && wrangler deploy",
     "test": "vitest run",
     "format": "biome format",
     "lint": "biome lint",
     "check": "biome check",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "intent": "node node_modules/@tanstack/intent/dist/cli.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
     "@tabler/icons-react": "^3.40.0",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-devtools": "latest",
+    "@tanstack/react-query": "^5.104.3",
     "@tanstack/react-router": "latest",
     "@tanstack/react-router-devtools": "latest",
     "@tanstack/react-router-ssr-query": "latest",
     "@tanstack/react-start": "latest",
+    "@tanstack/router-core": "latest",
     "@tanstack/router-plugin": "^1.132.0",
     "better-auth": "^1.5.5",
+    "cookie-es": "^3.1.1",
     "dotenv": "^17.3.1",
     "drizzle-orm": "^0.45.1",
     "fast-xml-parser": "^5.5.10",
     "lucide-react": "^0.545.0",
     "motion": "^12.38.0",
-    "nitro": "^3.0.260311-beta",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tailwind-merge": "^3.5.0",
@@ -42,8 +46,10 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.5",
+    "@cloudflare/vite-plugin": "^1.64.0",
     "@tailwindcss/typography": "^0.5.16",
     "@tanstack/devtools-vite": "latest",
+    "@tanstack/intent": "^0.5.5",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.0",
     "@types/node": "^22.10.2",
@@ -55,12 +61,28 @@
     "typescript": "^5.7.2",
     "vite": "^7.3.1",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^3.0.5"
+    "vitest": "^3.0.5",
+    "wrangler": "^4.151.1"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",
-      "lightningcss"
+      "lightningcss",
+      "workerd"
     ]
+  },
+  "intent": {
+    "skills": [
+      "@tanstack/react-start",
+      "@tanstack/router-core",
+      "@tanstack/start-client-core",
+      "@tanstack/start-server-core",
+      "@tanstack/router-plugin",
+      "@tanstack/devtools",
+      "@tanstack/devtools-vite",
+      "@tanstack/devtools-event-client",
+      "dotenv"
+    ],
+    "exclude": []
   }
 }

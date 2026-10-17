@@ -1,30 +1,38 @@
-import { defineConfig } from 'vite'
-import { devtools } from '@tanstack/devtools-vite'
-import tsconfigPaths from 'vite-tsconfig-paths'
+import { defineConfig } from "vite";
+import { devtools } from "@tanstack/devtools-vite";
+import tsconfigPaths from "vite-tsconfig-paths";
 
-import { tanstackStart } from '@tanstack/react-start/plugin/vite'
+import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 
-import viteReact from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
-import { nitro } from 'nitro/vite'
+import viteReact from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import { cloudflare } from "@cloudflare/vite-plugin";
+
+const rolldownCompat = (): import("vite").Plugin => ({
+	name: "tanstack-start-rolldown-compat",
+	configEnvironment(_name, envConfig) {
+		if (envConfig.build?.rolldownOptions) {
+			envConfig.build.rollupOptions = {
+				...envConfig.build.rolldownOptions,
+				...envConfig.build.rollupOptions,
+			};
+		}
+	},
+});
 
 const config = defineConfig({
-  plugins: [
-    devtools(),
-    tsconfigPaths({ projects: ['./tsconfig.json'] }),
-    tailwindcss(),
-    tanstackStart(),
-    viteReact(),
-    nitro(),
-  ],
-  server: {
-    allowedHosts: [
-      "unjuvenilely-nonveritable-kelsie.ngrok-free.dev",
-    ],
-  },
-  environments: {
-    ssr: { build: { rollupOptions: { input: "./server.ts" } } },
-  },
-})
+	plugins: [
+		cloudflare({ viteEnvironment: { name: "ssr" } }),
+		devtools(),
+		tsconfigPaths({ projects: ["./tsconfig.json"] }),
+		tailwindcss(),
+		tanstackStart(),
+		rolldownCompat(),
+		viteReact(),
+	],
+	server: {
+		allowedHosts: ["unjuvenilely-nonveritable-kelsie.ngrok-free.dev"],
+	},
+});
 
-export default config
+export default config;

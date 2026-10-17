@@ -10,4 +10,17 @@ function getDatabaseUrl(): string {
   return url;
 }
 
-export const db = drizzle(neon(getDatabaseUrl()), { schema });
+let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
+
+export function getDb() {
+  if (!_db) {
+    _db = drizzle(neon(getDatabaseUrl()), { schema });
+  }
+  return _db;
+}
+
+export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
+  get(_target, prop) {
+    return Reflect.get(getDb(), prop);
+  },
+});

@@ -1,5 +1,4 @@
 {
-  "extends": "nitro/tsconfig",
   "include": ["**/*.ts", "**/*.tsx"],
   "compilerOptions": {
     "target": "ES2022",
