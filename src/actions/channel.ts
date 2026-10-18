@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { db } from "#/db";
 import { youtubeChannels, videos } from "#/db/schema";
 import { getEnvVar } from "#/lib/server-utils";
@@ -16,9 +16,14 @@ export const fetchChannelByHandle = createServerFn({ method: "GET" })
 
     const cleanHandle = normalizeHandle(handle);
 
-    // 1. Check database cache
+    // 1. Check database cache by handle, channelId, title, or customUrl
     const cached = await db.query.youtubeChannels.findFirst({
-      where: eq(youtubeChannels.handle, cleanHandle),
+      where: or(
+        eq(youtubeChannels.handle, cleanHandle),
+        eq(youtubeChannels.channelId, handle),
+        eq(youtubeChannels.title, handle),
+        eq(youtubeChannels.customUrl, cleanHandle),
+      ),
     });
 
     if (cached && Date.now() - cached.fetchedAt.getTime() < CACHE_TTL_MS) {

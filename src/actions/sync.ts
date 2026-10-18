@@ -107,9 +107,13 @@ export async function syncChannelVideosBoundedInternal({
       item.contentDetails?.videoPublishedAt;
     const publishedAt = publishedAtStr ? new Date(publishedAtStr) : null;
     const thumbnail =
+      item.snippet?.thumbnails?.maxres?.url ||
+      item.snippet?.thumbnails?.standard?.url ||
       item.snippet?.thumbnails?.high?.url ||
-      item.snippet?.thumbnails?.medium?.url ||
+      details?.snippet?.thumbnails?.maxres?.url ||
+      details?.snippet?.thumbnails?.standard?.url ||
       details?.snippet?.thumbnails?.high?.url ||
+      item.snippet?.thumbnails?.medium?.url ||
       "";
     const duration = durationIso ?? null;
     const viewCount = details?.statistics?.viewCount ?? null;

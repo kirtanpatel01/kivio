@@ -63,6 +63,7 @@ export const fetchFeedForUser = createServerFn({ method: "GET" })
         v."duration" as "rawDuration",
         v."view_count" as "viewCount",
         yc."title" as "channelTitle",
+        yc."handle" as "channelHandle",
         yc."thumbnail_medium" as "channelAvatar"
       FROM "videos" v
       LEFT JOIN "youtube_channels" yc ON v."channel_id" = yc."channel_id"

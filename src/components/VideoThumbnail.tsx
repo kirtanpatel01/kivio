@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { cn } from "#/lib/utils";
 import { IconVideo } from "@tabler/icons-react";
 
@@ -15,20 +15,61 @@ export default function VideoThumbnail({
   alt = "",
   className,
 }: VideoThumbnailProps) {
-  const [imgSrc, setImgSrc] = useState<string | null | undefined>(src);
-  const [hasFailedAll, setHasFailedAll] = useState(false);
-  const [prevSrc, setPrevSrc] = useState(src);
+  // Extract effective videoId from props or from YouTube image URL
+  const effectiveVideoId = useMemo(() => {
+    if (videoId) return videoId;
+    if (src && src.includes("ytimg.com/vi/")) {
+      const match = src.match(/vi\/([a-zA-Z0-9_-]+)/);
+      return match ? match[1] : undefined;
+    }
+    return undefined;
+  }, [videoId, src]);
 
-  if (src !== prevSrc) {
-    setPrevSrc(src);
-    setImgSrc(src);
+  // Determine highest definition candidate URL (maxresdefault is Full HD 1280x720 / 1080p)
+  const getInitialSrc = () => {
+    if (effectiveVideoId) {
+      return `https://i.ytimg.com/vi/${effectiveVideoId}/maxresdefault.jpg`;
+    }
+    if (src && src.includes("hqdefault.jpg")) {
+      return src.replace("hqdefault.jpg", "maxresdefault.jpg");
+    }
+    return src;
+  };
+
+  const [imgSrc, setImgSrc] = useState<string | null | undefined>(getInitialSrc);
+  const [attemptStage, setAttemptStage] = useState<number>(0);
+  const [hasFailedAll, setHasFailedAll] = useState(false);
+
+  useEffect(() => {
+    setImgSrc(getInitialSrc());
+    setAttemptStage(0);
     setHasFailedAll(false);
-  }
+  }, [src, effectiveVideoId]);
 
   const handleError = () => {
-    // If it failed and we haven't tried YouTube's guaranteed hqdefault thumbnail yet
-    if (videoId && imgSrc !== `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`) {
-      setImgSrc(`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`);
+    if (!effectiveVideoId) {
+      if (src && imgSrc !== src) {
+        setImgSrc(src);
+      } else {
+        setHasFailedAll(true);
+      }
+      return;
+    }
+
+    // High Definition Fallback Ladder:
+    // Stage 0: maxresdefault.jpg (1280x720 Full HD)
+    // Stage 1: sddefault.jpg (640x480 Standard HD)
+    // Stage 2: hqdefault.jpg (480x360 High Quality - guaranteed on YouTube)
+    // Stage 3: provided src if different
+    if (attemptStage === 0) {
+      setAttemptStage(1);
+      setImgSrc(`https://i.ytimg.com/vi/${effectiveVideoId}/sddefault.jpg`);
+    } else if (attemptStage === 1) {
+      setAttemptStage(2);
+      setImgSrc(`https://i.ytimg.com/vi/${effectiveVideoId}/hqdefault.jpg`);
+    } else if (attemptStage === 2 && src && imgSrc !== src) {
+      setAttemptStage(3);
+      setImgSrc(src);
     } else {
       setHasFailedAll(true);
     }
@@ -54,6 +95,8 @@ export default function VideoThumbnail({
     <img
       src={imgSrc}
       alt={alt}
+      loading="lazy"
+      decoding="async"
       referrerPolicy="no-referrer"
       onError={handleError}
       className={className}

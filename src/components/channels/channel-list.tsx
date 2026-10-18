@@ -128,7 +128,10 @@ export default function ChannelList({ channels }: { channels: Channel[] }) {
               <div
                 key={channel.id}
                 className={`flex items-center justify-between p-2 rounded-lg cursor-pointer ${
-                  handle === channel.handle
+                  handle &&
+                  (handle.toLowerCase() === channel.handle.toLowerCase() ||
+                    handle.toLowerCase().replace(/^@/, "") ===
+                      channel.handle.toLowerCase().replace(/^@/, ""))
                     ? "bg-primary/10 border border-primary/20"
                     : "hover:bg-secondary/30 border border-transparent"
                 }`}

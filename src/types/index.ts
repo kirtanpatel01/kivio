@@ -28,6 +28,7 @@ export interface YouTubeVideo {
   channelId: string;
   duration: string | null;
   channelAvatar?: string;
+  channelHandle?: string;
   description?: string;
   viewCount?: string;
   likeCount?: string;

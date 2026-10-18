@@ -134,7 +134,7 @@ function PlaylistPage() {
                 to="/videos/$videoId"
                 params={{ videoId: video.id }}
                 search={{ playlistId: playlist.id }}
-                className="hover:scale-[1.02] transition-transform duration-300"
+                className="block"
               >
                 <VideoCard video={video} />
               </Link>

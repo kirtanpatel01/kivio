@@ -329,7 +329,7 @@ function Dashboard() {
                 to={`/videos/$videoId`}
                 params={{ videoId: video.id }}
                 key={video.id}
-                className="hover:scale-[1.01] transition-transform"
+                className="block"
               >
                 <VideoCard
                   video={video}

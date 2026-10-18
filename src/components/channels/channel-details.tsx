@@ -533,7 +533,7 @@ export default function ChannelDetails() {
                       to="/videos/$videoId"
                       params={{ videoId: video.id }}
                       key={video.id}
-                      className="hover:scale-[1.01]"
+                      className="block"
                     >
                       <VideoCard
                         video={video}

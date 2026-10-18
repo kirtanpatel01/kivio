@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import { db } from "#/db";
 import { channels, videos, youtubeChannels } from "#/db/schema";
 import { getSession, ensureSession } from "#/lib/auth.functions";
@@ -161,18 +161,32 @@ export const getVideosForChannelHandle = createServerFn({ method: "GET" })
     const cleanHandle = normalizeHandle(handle);
     if (!cleanHandle) return { videos: [], hasMore: false };
 
+    // 1. Resolve channel record by handle, customUrl, title, or channelId
+    const yc = await db.query.youtubeChannels.findFirst({
+      where: or(
+        eq(youtubeChannels.handle, cleanHandle),
+        eq(youtubeChannels.customUrl, cleanHandle),
+        eq(youtubeChannels.title, handle),
+        eq(youtubeChannels.channelId, handle),
+      ),
+    });
+
+    if (!yc) return { videos: [], hasMore: false };
+
+    // 2. Check if user follows this channel (match by cleanHandle or the resolved channel's handle/customUrl)
     const isFollowing = await db.query.channels.findFirst({
       where: and(
         eq(channels.userId, userId),
-        sql`lower(${channels.handle}) = ${cleanHandle}`,
+        or(
+          sql`lower(${channels.handle}) = ${cleanHandle}`,
+          yc.handle ? eq(channels.handle, yc.handle) : sql`false`,
+          yc.customUrl
+            ? sql`lower(${channels.handle}) = ${yc.customUrl.toLowerCase()}`
+            : sql`false`,
+        ),
       ),
     });
     if (!isFollowing) return { videos: [], hasMore: false };
-
-    const yc = await db.query.youtubeChannels.findFirst({
-      where: eq(youtubeChannels.handle, cleanHandle),
-    });
-    if (!yc) return { videos: [], hasMore: false };
 
     const shortFilter =
       isShort === true

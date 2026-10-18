@@ -7,7 +7,12 @@ import type { YouTubeVideo } from "#/types";
 
 export function mapDbVideoToYouTubeVideo(
   v: any,
-  channelInfo?: { title: string; thumbnailMedium: string },
+  channelInfo?: {
+    title: string;
+    thumbnailMedium: string;
+    handle?: string;
+    customUrl?: string;
+  },
 ): YouTubeVideo | null {
   if (!v) return null;
 
@@ -30,6 +35,13 @@ export function mapDbVideoToYouTubeVideo(
       likeCount: v.likeCount ? String(v.likeCount) : undefined,
       channelId: v.channelId,
       channelTitle: channelInfo?.title ?? v.channelTitle ?? v.youtubeChannel?.title ?? "",
+      channelHandle:
+        channelInfo?.handle ??
+        v.channelHandle ??
+        v.youtubeChannel?.handle ??
+        channelInfo?.customUrl ??
+        v.youtubeChannel?.customUrl ??
+        undefined,
       channelAvatar:
         channelInfo?.thumbnailMedium ?? v.channelAvatar ?? v.youtubeChannel?.thumbnailMedium ?? "",
       uploadsPlaylistId: v.uploadsPlaylistId ?? v.youtubeChannel?.uploadsPlaylistId,
@@ -61,8 +73,12 @@ export function mapDbVideoToYouTubeVideo(
   // 4. Extract Title (Crucial for untitled bug)
   const title = rawSnippet?.title ?? plSnippet?.title ?? v.id;
 
-  // 5. Extract Thumbnail
+  // 5. Extract Thumbnail (Prioritize Full HD maxres, then standard, then high)
   const thumb =
+    rawSnippet?.thumbnails?.maxres?.url ??
+    plSnippet?.thumbnails?.maxres?.url ??
+    rawSnippet?.thumbnails?.standard?.url ??
+    plSnippet?.thumbnails?.standard?.url ??
     rawSnippet?.thumbnails?.high?.url ??
     plSnippet?.thumbnails?.high?.url ??
     rawSnippet?.thumbnails?.medium?.url ??
@@ -88,6 +104,7 @@ export function mapDbVideoToYouTubeVideo(
     likeCount: rawStatistics?.likeCount ?? undefined,
     channelId: v.channelId,
     channelTitle: channelInfo?.title ?? v.youtubeChannel?.title ?? "",
+    channelHandle: v.channelHandle ?? v.youtubeChannel?.handle ?? undefined,
     channelAvatar:
       channelInfo?.thumbnailMedium ?? v.youtubeChannel?.thumbnailMedium ?? "",
     uploadsPlaylistId: (v.youtubeChannel as any)?.uploadsPlaylistId,
@@ -109,8 +126,12 @@ export const getSuggestedVideos = createServerFn({ method: "GET" })
         coalesce(v."raw_video" -> 'snippet' ->> 'title', v."raw_playlist_item" -> 'snippet' ->> 'title', v."id") as "title",
         coalesce(v."raw_video" -> 'snippet' ->> 'publishedAt', v."raw_playlist_item" -> 'contentDetails' ->> 'videoPublishedAt') as "publishedAt",
         coalesce(
+          v."raw_video" -> 'snippet' -> 'thumbnails' -> 'maxres' ->> 'url',
+          v."raw_video" -> 'snippet' -> 'thumbnails' -> 'standard' ->> 'url',
           v."raw_video" -> 'snippet' -> 'thumbnails' -> 'high' ->> 'url',
           v."raw_video" -> 'snippet' -> 'thumbnails' -> 'medium' ->> 'url',
+          v."raw_playlist_item" -> 'snippet' -> 'thumbnails' -> 'maxres' ->> 'url',
+          v."raw_playlist_item" -> 'snippet' -> 'thumbnails' -> 'standard' ->> 'url',
           v."raw_playlist_item" -> 'snippet' -> 'thumbnails' -> 'high' ->> 'url',
           ''
         ) as "thumbnail",

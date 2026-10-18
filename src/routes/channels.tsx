@@ -52,8 +52,23 @@ export const Route = createFileRoute("/channels")({
         isLoggedIn: !!session?.user,
       };
     }
-    const [details, videoResult, playlists, watchedIds] = await Promise.all([
-      fetchChannelByHandle({ data: handle }),
+    const details = await fetchChannelByHandle({ data: handle });
+
+    if (
+      details?.customUrl &&
+      details.customUrl.toLowerCase() !== handle.toLowerCase()
+    ) {
+      throw redirect({
+        to: "/channels",
+        search: {
+          handle: details.customUrl,
+          tab,
+        },
+        replace: true,
+      });
+    }
+
+    const [videoResult, playlists, watchedIds] = await Promise.all([
       tab !== "playlists"
         ? getVideosForChannelHandle({
             data: { handle, isShort: tab === "shorts", offset: 0, limit: 50 },
