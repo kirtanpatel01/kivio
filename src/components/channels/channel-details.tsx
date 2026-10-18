@@ -374,11 +374,16 @@ export default function ChannelDetails() {
                       </span>
                       <button
                         onClick={handleSyncAll}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-[11px] font-bold transition-all shadow-xs cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-                        title="Sync all channel videos in background batches"
+                        disabled={isSyncingAll || isSyncing}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none disabled:cursor-not-allowed rounded-lg text-[11px] font-bold transition-all shadow-xs cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+                        title={isSyncingAll || isSyncing ? "Syncing is in progress..." : "Sync all channel videos in background batches"}
                       >
-                        <IconCloudDownload size={13} stroke={2} />
-                        <span>Sync All</span>
+                        {isSyncingAll || isSyncing ? (
+                          <IconRefresh size={13} className="animate-spin" />
+                        ) : (
+                          <IconCloudDownload size={13} stroke={2} />
+                        )}
+                        <span>{isSyncingAll ? "Syncing..." : isSyncing ? "Syncing..." : "Sync All"}</span>
                       </button>
                     </div>
                   )}
