@@ -300,6 +300,7 @@ export const getVideosForChannelHandle = createServerFn({ method: "GET" })
     return {
       videos: mapped,
       hasMore,
+      totalInDb,
     };
   });
 
@@ -315,6 +316,66 @@ export const syncChannelNow = createServerFn({ method: "POST" })
       uploadsPlaylistId: yc.uploadsPlaylistId,
       limit: 50,
     });
+  });
+
+export const syncChannelNextBatch = createServerFn({ method: "POST" })
+  .validator((channelId: string) => channelId)
+  .handler(async ({ data: channelId }) => {
+    const session = await getSession();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+
+    const yc = await db.query.youtubeChannels.findFirst({
+      where: eq(youtubeChannels.channelId, channelId),
+    });
+    if (!yc || !yc.uploadsPlaylistId) throw new Error("Channel not found");
+
+    const countRes = await db.execute(sql`
+      SELECT count(*)::int as total FROM "videos" WHERE "channel_id" = ${yc.channelId}
+    `);
+    const totalBefore = (countRes.rows[0] as any)?.total ?? 0;
+    const expectedTotal = parseInt(yc.videoCount, 10) || 0;
+
+    let pageToken: string | null | undefined = yc.nextPageToken;
+
+    // If we have no token and haven't reached expected total, sync first page to discover token
+    if (!pageToken && totalBefore < expectedTotal) {
+      const firstRes = await syncChannelVideosBoundedInternal({
+        channelId: yc.channelId,
+        uploadsPlaylistId: yc.uploadsPlaylistId,
+        limit: 50,
+      });
+      pageToken = firstRes.nextPageToken;
+    }
+
+    if (!pageToken) {
+      return {
+        syncedInBatch: 0,
+        totalInDb: totalBefore,
+        nextPageToken: null,
+        isComplete: true,
+      };
+    }
+
+    const syncRes = await syncChannelVideosBoundedInternal({
+      channelId: yc.channelId,
+      uploadsPlaylistId: yc.uploadsPlaylistId,
+      limit: 50,
+      pageToken,
+    });
+
+    const updatedCountRes = await db.execute(sql`
+      SELECT count(*)::int as total FROM "videos" WHERE "channel_id" = ${yc.channelId}
+    `);
+    const totalAfter = (updatedCountRes.rows[0] as any)?.total ?? 0;
+
+    const isComplete = !syncRes.nextPageToken || totalAfter >= expectedTotal;
+
+    return {
+      syncedInBatch: syncRes.totalSynced,
+      totalInDb: totalAfter,
+      nextPageToken: syncRes.nextPageToken ?? null,
+      isComplete,
+    };
   });
 
 export const updateUserChannel = createServerFn({ method: "POST" })

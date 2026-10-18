@@ -1,5 +1,7 @@
 import {
   IconBrandYoutube,
+  IconCheck,
+  IconCloudDownload,
   IconEye,
   IconInfoCircle,
   IconLoader,
@@ -9,13 +11,22 @@ import {
   IconVideo,
   IconX,
 } from "@tabler/icons-react";
-import { getRouteApi, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import {
+  getRouteApi,
+  Link,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router";
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import VideoCard from "#/components/video-card";
 import Avatar from "#/components/Avatar";
 import VideoThumbnail from "#/components/VideoThumbnail";
 import { formatCount, formatDate } from "#/lib/utils";
-import { getVideosForChannelHandle, syncChannelNow } from "#/actions/channels";
+import {
+  getVideosForChannelHandle,
+  syncChannelNextBatch,
+  syncChannelNow,
+} from "#/actions/channels";
 import type {
   YouTubeChannelDetails,
   YouTubePlaylist,
@@ -27,11 +38,12 @@ const routeApi = getRouteApi("/channels");
 export default function ChannelDetails() {
   const { handle, tab } = routeApi.useSearch();
   const navigate = useNavigate({ from: "/channels" });
-  const { details, channelVideos, initialHasMore, playlists, watchedIds } =
+  const { details, channelVideos, initialHasMore, initialTotalInDb, playlists, watchedIds } =
     routeApi.useLoaderData() as {
       details: YouTubeChannelDetails | null;
       channelVideos: YouTubeVideo[];
       initialHasMore?: boolean;
+      initialTotalInDb?: number;
       playlists: YouTubePlaylist[];
       watchedIds: string[];
     };
@@ -40,6 +52,9 @@ export default function ChannelDetails() {
   const [videos, setVideos] = useState<YouTubeVideo[]>(channelVideos ?? []);
   const [hasMore, setHasMore] = useState(initialHasMore ?? false);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [syncedCount, setSyncedCount] = useState<number>(initialTotalInDb ?? (channelVideos?.length ?? 0));
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const stopSyncRef = useRef(false);
   const observerTarget = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
@@ -48,8 +63,11 @@ export default function ChannelDetails() {
   useEffect(() => {
     setVideos(channelVideos ?? []);
     setHasMore(initialHasMore ?? false);
+    setSyncedCount(initialTotalInDb ?? (channelVideos?.length ?? 0));
     setSearchQuery("");
-  }, [channelVideos, initialHasMore, handle, tab]);
+    setIsSyncingAll(false);
+    stopSyncRef.current = true;
+  }, [channelVideos, initialHasMore, initialTotalInDb, handle, tab]);
 
   // Server-side search debounce for channel videos
   useEffect(() => {
@@ -162,6 +180,50 @@ export default function ChannelDetails() {
     }
   };
 
+  const handleSyncAll = async () => {
+    if (!details?.id || isSyncingAll) return;
+    setIsSyncingAll(true);
+    stopSyncRef.current = false;
+
+    try {
+      while (!stopSyncRef.current) {
+        const res = await syncChannelNextBatch({ data: details.id });
+        setSyncedCount(res.totalInDb);
+
+        if (res.isComplete || !res.nextPageToken) {
+          break;
+        }
+
+        // Brief 150ms delay between batches for UI smoothness and rate limit respect
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      }
+
+      // Re-fetch the current tab's videos so newly synced videos appear immediately
+      if (handle) {
+        const updated = await getVideosForChannelHandle({
+          data: {
+            handle,
+            isShort: tab === "shorts",
+            offset: 0,
+            limit: 50,
+            q: searchQuery || undefined,
+          },
+        });
+        setVideos(updated.videos);
+        setHasMore(updated.hasMore);
+      }
+    } catch (err) {
+      console.error("[ChannelDetails] Sync All error:", err);
+    } finally {
+      setIsSyncingAll(false);
+    }
+  };
+
+  const handleStopSyncAll = () => {
+    stopSyncRef.current = true;
+    setIsSyncingAll(false);
+  };
+
   const setTab = (newTab: "videos" | "shorts" | "playlists") => {
     setSearchQuery(""); // Clear search when switching tabs
     navigate({
@@ -235,34 +297,94 @@ export default function ChannelDetails() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm text-muted-foreground sm:ml-auto">
-            <span className="inline-flex items-center gap-1">
-              <IconUsers size={14} className="opacity-70" />
-              <span className="text-foreground font-medium">
-                {formatCount(details.statistics.subscriberCount)}
+          <div className="flex flex-col sm:items-end gap-2 sm:ml-auto">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <IconUsers size={14} className="opacity-70" />
+                <span className="text-foreground font-medium">
+                  {formatCount(details.statistics.subscriberCount)}
+                </span>
+                <span className="hidden sm:inline">subs</span>
               </span>
-              <span className="hidden sm:inline">subs</span>
-            </span>
-            <span className="text-border hidden sm:inline">·</span>
-            <span className="inline-flex items-center gap-1">
-              <IconEye size={14} className="opacity-70" />
-              <span className="text-foreground font-medium">
-                {formatCount(details.statistics.viewCount)}
+              <span className="text-border hidden sm:inline">·</span>
+              <span className="inline-flex items-center gap-1">
+                <IconEye size={14} className="opacity-70" />
+                <span className="text-foreground font-medium">
+                  {formatCount(details.statistics.viewCount)}
+                </span>
+                <span className="hidden sm:inline">views</span>
               </span>
-              <span className="hidden sm:inline">views</span>
-            </span>
-            <span className="text-border hidden sm:inline">·</span>
-            <span className="inline-flex items-center gap-1">
-              <IconVideo size={14} className="opacity-70" />
-              <span className="text-foreground font-medium">
-                {formatCount(details.statistics.videoCount)}
+              <span className="text-border hidden sm:inline">·</span>
+              <span className="inline-flex items-center gap-1">
+                <IconVideo size={14} className="opacity-70" />
+                <span className="text-foreground font-medium">
+                  {formatCount(details.statistics.videoCount)}
+                </span>
+                <span className="hidden sm:inline">videos</span>
               </span>
-              <span className="hidden sm:inline">videos</span>
-            </span>
-            <span className="text-border hidden sm:inline">·</span>
-            <span className="text-xs">
-              Joined {formatDate(details.publishedAt)}
-            </span>
+              <span className="text-border hidden sm:inline">·</span>
+              <span className="text-xs">
+                Joined {formatDate(details.publishedAt)}
+              </span>
+            </div>
+
+            {/* Compact Sync All / Progress Bar Area directly below stats */}
+            {(() => {
+              const totalVideos = parseInt(details.statistics.videoCount, 10) || 0;
+              const remaining = Math.max(0, totalVideos - syncedCount);
+              const isAllSynced = totalVideos > 0 && remaining === 0;
+              const progressPercent =
+                totalVideos > 0
+                  ? Math.min(100, Math.round((syncedCount / totalVideos) * 100))
+                  : 100;
+
+              return (
+                <div className="flex flex-col sm:items-end gap-1.5 w-full sm:w-auto">
+                  {isAllSynced ? (
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[11px] font-semibold">
+                      <IconCheck size={12} stroke={2.5} />
+                      <span>All {syncedCount} videos synced</span>
+                    </div>
+                  ) : isSyncingAll ? (
+                    <div className="flex flex-col sm:items-end gap-1 w-full sm:w-auto">
+                      <div className="flex items-center justify-between sm:justify-end gap-2.5 text-xs font-medium">
+                        <span className="text-muted-foreground text-[11px]">
+                          Syncing... <span className="font-bold text-foreground">{syncedCount}</span> / {totalVideos} ({remaining} remaining)
+                        </span>
+                        <button
+                          onClick={handleStopSyncAll}
+                          className="text-[10px] text-muted-foreground hover:text-red-400 font-semibold underline cursor-pointer"
+                          title="Pause background sync"
+                        >
+                          Pause
+                        </button>
+                      </div>
+                      <div className="w-full sm:w-56 h-1.5 bg-secondary/60 rounded-full overflow-hidden border border-border/40">
+                        <div
+                          className="h-full bg-primary transition-all duration-300 ease-out rounded-full"
+                          style={{ width: `${progressPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between sm:justify-end gap-2.5">
+                      <span className="text-[11px] text-muted-foreground">
+                        <span className="font-semibold text-foreground">{syncedCount}</span> / {totalVideos} synced
+                        {remaining > 0 ? ` (${remaining} remaining)` : ""}
+                      </span>
+                      <button
+                        onClick={handleSyncAll}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-[11px] font-bold transition-all shadow-xs cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+                        title="Sync all channel videos in background batches"
+                      >
+                        <IconCloudDownload size={13} stroke={2} />
+                        <span>Sync All</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -366,7 +488,8 @@ export default function ChannelDetails() {
                   {tab !== "playlists" && (
                     <div className="mt-4 flex flex-col items-center gap-2">
                       <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                        Sync the latest 50 videos from YouTube into your library.
+                        Sync the latest 50 videos from YouTube into your
+                        library.
                       </p>
                       <button
                         onClick={handleSync}
@@ -446,7 +569,9 @@ export default function ChannelDetails() {
               {isFetchingMore ? (
                 <div className="flex items-center gap-2.5 text-muted-foreground animate-in fade-in">
                   <IconLoader className="animate-spin text-primary" size={20} />
-                  <span className="text-sm font-medium">Loading more videos...</span>
+                  <span className="text-sm font-medium">
+                    Loading more videos...
+                  </span>
                 </div>
               ) : hasMore ? (
                 <button

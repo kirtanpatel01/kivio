@@ -46,6 +46,7 @@ export const Route = createFileRoute("/channels")({
         details: null,
         channelVideos: [],
         initialHasMore: false,
+        initialTotalInDb: 0,
         playlists: [],
         watchedIds: [],
         isLoggedIn: !!session?.user,
@@ -57,7 +58,7 @@ export const Route = createFileRoute("/channels")({
         ? getVideosForChannelHandle({
             data: { handle, isShort: tab === "shorts", offset: 0, limit: 50 },
           })
-        : Promise.resolve({ videos: [], hasMore: false }),
+        : Promise.resolve({ videos: [], hasMore: false, totalInDb: 0 }),
       tab === "playlists"
         ? fetchPlaylistsByHandle({ data: handle })
         : Promise.resolve([]),
@@ -68,6 +69,7 @@ export const Route = createFileRoute("/channels")({
       details,
       channelVideos: videoResult && "videos" in videoResult ? videoResult.videos : [],
       initialHasMore: videoResult && "hasMore" in videoResult ? videoResult.hasMore : false,
+      initialTotalInDb: videoResult && "totalInDb" in videoResult ? (videoResult.totalInDb as number) : 0,
       playlists: playlists ?? [],
       watchedIds: watchedIds ?? [],
       isLoggedIn: !!session?.user,
