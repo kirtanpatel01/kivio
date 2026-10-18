@@ -122,6 +122,7 @@ export const youtubeChannels = pgTable("youtube_channels", {
     withTimezone: true,
   }),
   subscriptionSecret: text("subscription_secret"),
+  nextPageToken: text("next_page_token"),
 
   // Cache metadata
   fetchedAt: timestamp("fetched_at", { withTimezone: true })

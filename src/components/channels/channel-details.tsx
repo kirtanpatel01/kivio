@@ -2,6 +2,7 @@ import {
   IconBrandYoutube,
   IconEye,
   IconInfoCircle,
+  IconLoader,
   IconRefresh,
   IconSearch,
   IconUsers,
@@ -9,12 +10,12 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { getRouteApi, Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import VideoCard from "#/components/video-card";
 import Avatar from "#/components/Avatar";
 import VideoThumbnail from "#/components/VideoThumbnail";
 import { formatCount, formatDate } from "#/lib/utils";
-import { syncChannelNow } from "#/actions/channels";
+import { getVideosForChannelHandle, syncChannelNow } from "#/actions/channels";
 import type {
   YouTubeChannelDetails,
   YouTubePlaylist,
@@ -26,23 +27,115 @@ const routeApi = getRouteApi("/channels");
 export default function ChannelDetails() {
   const { handle, tab } = routeApi.useSearch();
   const navigate = useNavigate({ from: "/channels" });
-  const { details, channelVideos, playlists, watchedIds } =
+  const { details, channelVideos, initialHasMore, playlists, watchedIds } =
     routeApi.useLoaderData() as {
       details: YouTubeChannelDetails | null;
       channelVideos: YouTubeVideo[];
+      initialHasMore?: boolean;
       playlists: YouTubePlaylist[];
       watchedIds: string[];
     };
 
   const router = useRouter();
+  const [videos, setVideos] = useState<YouTubeVideo[]>(channelVideos ?? []);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(initialHasMore ?? false);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const observerTarget = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Sync state if loader data, handle, or tab changes
+  useEffect(() => {
+    setVideos(channelVideos ?? []);
+    setHasMore(initialHasMore ?? false);
+    setPage(0);
+    setSearchQuery("");
+  }, [channelVideos, initialHasMore, handle, tab]);
+
+  // Server-side search debounce for channel videos
+  useEffect(() => {
+    if (tab === "playlists" || !handle) return;
+    const timer = setTimeout(async () => {
+      setIsFetchingMore(true);
+      try {
+        const res = await getVideosForChannelHandle({
+          data: {
+            handle,
+            isShort: tab === "shorts",
+            page: 0,
+            limit: 50,
+            q: searchQuery || undefined,
+          },
+        });
+        setVideos(res.videos);
+        setPage(0);
+        setHasMore(res.hasMore);
+      } catch (err) {
+        console.error("[ChannelDetails] Search error:", err);
+      } finally {
+        setIsFetchingMore(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, handle, tab]);
+
+  const loadMore = useCallback(async () => {
+    if (isFetchingMore || !hasMore || tab === "playlists" || !handle) return;
+
+    setIsFetchingMore(true);
+    try {
+      const nextPage = page + 1;
+      const res = await getVideosForChannelHandle({
+        data: {
+          handle,
+          isShort: tab === "shorts",
+          page: nextPage,
+          limit: 50,
+          q: searchQuery || undefined,
+        },
+      });
+
+      if (res && res.videos && res.videos.length > 0) {
+        setVideos((prev) => [...prev, ...res.videos]);
+        setPage(nextPage);
+        setHasMore(res.hasMore);
+      } else {
+        setHasMore(false);
+      }
+    } catch (err) {
+      console.error("[ChannelDetails] Error loading more videos:", err);
+    } finally {
+      setIsFetchingMore(false);
+    }
+  }, [page, hasMore, isFetchingMore, tab, handle, searchQuery]);
+
+  useEffect(() => {
+    if (!hasMore || isFetchingMore || tab === "playlists" || videos.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry && entry.isIntersecting) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1 },
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => observer.disconnect();
+  }, [loadMore, hasMore, isFetchingMore, tab, videos.length]);
 
   const handleSync = async () => {
     if (!details?.id || isSyncing) return;
     try {
       setIsSyncing(true);
       await syncChannelNow({ data: details.id });
+      setPage(0);
       await router.invalidate();
     } catch (err) {
       console.error("[ChannelDetails] Sync failed:", err);
@@ -60,24 +153,18 @@ export default function ChannelDetails() {
 
   // Filter data based on tab AND search query
   const filteredData = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
-
-    if (tab === "shorts") {
-      const shorts = channelVideos.filter((v) => v.isShort);
-      if (!q) return shorts;
-      return shorts.filter((v) => v.title.toLowerCase().includes(q));
-    }
-
     if (tab === "playlists") {
+      const q = searchQuery.toLowerCase().trim();
       if (!q) return playlists;
       return playlists.filter((p) => p.title.toLowerCase().includes(q));
     }
 
-    // Default: Videos
-    const vids = channelVideos.filter((v) => !v.isShort);
-    if (!q) return vids;
-    return vids.filter((v) => v.title.toLowerCase().includes(q));
-  }, [tab, channelVideos, playlists, searchQuery]);
+    if (tab === "shorts") {
+      return videos.filter((v) => v.isShort);
+    }
+
+    return videos.filter((v) => !v.isShort);
+  }, [tab, videos, playlists, searchQuery]);
 
   const watchedSet = new Set(watchedIds);
 
@@ -329,6 +416,32 @@ export default function ChannelDetails() {
                       />
                     </Link>
                   ))}
+            </div>
+          )}
+
+          {/* Infinite Scroll Sentinel & Loading Indicator */}
+          {tab !== "playlists" && (
+            <div
+              ref={observerTarget}
+              className="w-full py-12 flex flex-col items-center justify-center gap-2"
+            >
+              {isFetchingMore ? (
+                <div className="flex items-center gap-2.5 text-muted-foreground animate-in fade-in">
+                  <IconLoader className="animate-spin text-primary" size={20} />
+                  <span className="text-sm font-medium">Loading more videos...</span>
+                </div>
+              ) : hasMore ? (
+                <button
+                  onClick={loadMore}
+                  className="text-xs font-semibold text-primary/80 hover:text-primary transition-colors py-2 px-4 rounded-xl border border-primary/20 hover:border-primary/40 bg-primary/5 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  Load more videos
+                </button>
+              ) : videos.length > 0 ? (
+                <p className="text-xs text-muted-foreground/50 font-medium">
+                  Showing all {videos.length} videos
+                </p>
+              ) : null}
             </div>
           )}
         </div>

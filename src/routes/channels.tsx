@@ -45,18 +45,19 @@ export const Route = createFileRoute("/channels")({
         channels,
         details: null,
         channelVideos: [],
+        initialHasMore: false,
         playlists: [],
         watchedIds: [],
         isLoggedIn: !!session?.user,
       };
     }
-    const [details, channelVideos, playlists, watchedIds] = await Promise.all([
+    const [details, videoResult, playlists, watchedIds] = await Promise.all([
       fetchChannelByHandle({ data: handle }),
       tab !== "playlists"
         ? getVideosForChannelHandle({
-            data: { handle, isShort: tab === "shorts" },
+            data: { handle, isShort: tab === "shorts", page: 0, limit: 50 },
           })
-        : Promise.resolve([]),
+        : Promise.resolve({ videos: [], hasMore: false }),
       tab === "playlists"
         ? fetchPlaylistsByHandle({ data: handle })
         : Promise.resolve([]),
@@ -65,7 +66,8 @@ export const Route = createFileRoute("/channels")({
     return {
       channels,
       details,
-      channelVideos,
+      channelVideos: videoResult && "videos" in videoResult ? videoResult.videos : [],
+      initialHasMore: videoResult && "hasMore" in videoResult ? videoResult.hasMore : false,
       playlists: playlists ?? [],
       watchedIds: watchedIds ?? [],
       isLoggedIn: !!session?.user,

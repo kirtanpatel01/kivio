@@ -128,19 +128,34 @@ export const removeUserChannel = createServerFn({ method: "POST" })
     }
   });
 
-/** Videos stored for a channel, scoped to channels the signed-in user follows. */
+/** Videos stored for a channel, scoped to channels the signed-in user follows with pagination & auto-sync. */
 export const getVideosForChannelHandle = createServerFn({ method: "GET" })
-  .validator((input: string | { handle: string; isShort?: boolean }) => input)
+  .validator(
+    (
+      input:
+        | string
+        | {
+            handle: string;
+            isShort?: boolean;
+            page?: number;
+            limit?: number;
+            q?: string;
+          },
+    ) => input,
+  )
   .handler(async ({ data: input }) => {
     const handle = typeof input === "string" ? input : input.handle;
     const isShort = typeof input === "object" ? input.isShort : undefined;
+    const page = typeof input === "object" ? (input.page ?? 0) : 0;
+    const limit = typeof input === "object" ? (input.limit ?? 50) : 50;
+    const q = typeof input === "object" ? input.q?.trim() : undefined;
 
     const session = await getSession();
     const userId = session?.user?.id;
-    if (!userId) return [];
+    if (!userId) return { videos: [], hasMore: false };
 
     const cleanHandle = normalizeHandle(handle);
-    if (!cleanHandle) return [];
+    if (!cleanHandle) return { videos: [], hasMore: false };
 
     const isFollowing = await db.query.channels.findFirst({
       where: and(
@@ -148,12 +163,12 @@ export const getVideosForChannelHandle = createServerFn({ method: "GET" })
         sql`lower(${channels.handle}) = ${cleanHandle}`,
       ),
     });
-    if (!isFollowing) return [];
+    if (!isFollowing) return { videos: [], hasMore: false };
 
     const yc = await db.query.youtubeChannels.findFirst({
       where: eq(youtubeChannels.handle, cleanHandle),
     });
-    if (!yc) return [];
+    if (!yc) return { videos: [], hasMore: false };
 
     const shortFilter =
       isShort === true
@@ -162,28 +177,35 @@ export const getVideosForChannelHandle = createServerFn({ method: "GET" })
           ? sql`AND (v."is_short" IS NOT TRUE OR v."is_short" IS NULL)`
           : sql``;
 
-    const result = await db.execute(sql`
-      SELECT 
-        v."id",
-        v."channel_id" as "channelId",
-        v."duration_seconds" as "durationSeconds",
-        v."is_short" as "isShort",
-        coalesce(v."title", v."id") as "title",
-        coalesce(v."published_at"::text, v."created_at"::text) as "publishedAt",
-        coalesce(v."thumbnail", '') as "thumbnail",
-        v."duration" as "rawDuration",
-        v."view_count" as "viewCount"
-      FROM "videos" v
-      WHERE v."channel_id" = ${yc.channelId}
-      ${shortFilter}
-      ORDER BY v."published_at" DESC NULLS LAST
-      LIMIT 50;
-    `);
+    const searchFilter = q ? sql`AND v."title" ILIKE ${`%${q}%`}` : sql``;
 
-    let rows = result.rows as any[];
+    const queryPage = async () => {
+      const result = await db.execute(sql`
+        SELECT 
+          v."id",
+          v."channel_id" as "channelId",
+          v."duration_seconds" as "durationSeconds",
+          v."is_short" as "isShort",
+          coalesce(v."title", v."id") as "title",
+          coalesce(v."published_at"::text, v."created_at"::text) as "publishedAt",
+          coalesce(v."thumbnail", '') as "thumbnail",
+          v."duration" as "rawDuration",
+          v."view_count" as "viewCount"
+        FROM "videos" v
+        WHERE v."channel_id" = ${yc.channelId}
+        ${shortFilter}
+        ${searchFilter}
+        ORDER BY v."published_at" DESC NULLS LAST
+        LIMIT ${limit + 1}
+        OFFSET ${page * limit};
+      `);
+      return result.rows as any[];
+    };
+
+    let rows = await queryPage();
 
     // Auto-sync on first visit: If DB has 0 videos for this channel, fetch the initial 50 videos now!
-    if (rows.length === 0 && yc.uploadsPlaylistId) {
+    if (rows.length === 0 && page === 0 && !q && yc.uploadsPlaylistId) {
       const hasAnyVideos = await db.query.videos.findFirst({
         where: eq(videos.channelId, yc.channelId),
         columns: { id: true },
@@ -196,33 +218,53 @@ export const getVideosForChannelHandle = createServerFn({ method: "GET" })
             uploadsPlaylistId: yc.uploadsPlaylistId,
             limit: 50,
           });
-
-          // Re-query newly synced videos
-          const refreshed = await db.execute(sql`
-            SELECT 
-              v."id",
-              v."channel_id" as "channelId",
-              v."duration_seconds" as "durationSeconds",
-              v."is_short" as "isShort",
-              coalesce(v."title", v."id") as "title",
-              coalesce(v."published_at"::text, v."created_at"::text) as "publishedAt",
-              coalesce(v."thumbnail", '') as "thumbnail",
-              v."duration" as "rawDuration",
-              v."view_count" as "viewCount"
-            FROM "videos" v
-            WHERE v."channel_id" = ${yc.channelId}
-            ${shortFilter}
-            ORDER BY v."published_at" DESC NULLS LAST
-            LIMIT 50;
-          `);
-          rows = refreshed.rows as any[];
+          rows = await queryPage();
         } catch (syncErr: unknown) {
           console.error(`[AutoSyncOnVisit] Failed for ${yc.channelId}:`, syncErr);
         }
       }
     }
 
-    return rows
+    // If DB returned fewer than limit rows (or 0 rows on page > 0), check if YouTube has older videos to sync
+    if (rows.length <= limit && !q && yc.uploadsPlaylistId) {
+      const countRes = await db.execute(sql`
+        SELECT count(*)::int as total FROM "videos" WHERE "channel_id" = ${yc.channelId}
+      `);
+      const totalInDb = (countRes.rows[0] as any)?.total ?? 0;
+      const expectedTotal = parseInt(yc.videoCount, 10) || 0;
+
+      // When user reached beyond cached DB videos, fetch the next 50 from YouTube
+      if (rows.length === 0 && page * limit >= totalInDb && totalInDb < expectedTotal) {
+        try {
+          let currentToken: string | null | undefined = yc.nextPageToken;
+          if (!currentToken) {
+            const firstPageRes = await syncChannelVideosBoundedInternal({
+              channelId: yc.channelId,
+              uploadsPlaylistId: yc.uploadsPlaylistId,
+              limit: 50,
+            });
+            currentToken = firstPageRes.nextPageToken;
+          }
+
+          if (currentToken) {
+            await syncChannelVideosBoundedInternal({
+              channelId: yc.channelId,
+              uploadsPlaylistId: yc.uploadsPlaylistId,
+              limit: 50,
+              pageToken: currentToken,
+            });
+            rows = await queryPage();
+          }
+        } catch (syncOlderErr: unknown) {
+          console.error(`[SyncOlderVideos] Error syncing older videos for ${yc.channelId}:`, syncOlderErr);
+        }
+      }
+    }
+
+    const hasMore = rows.length > limit;
+    const pageRows = rows.slice(0, limit);
+
+    const mapped = pageRows
       .map((v) =>
         mapDbVideoToYouTubeVideo(v, {
           title: yc.title,
@@ -230,6 +272,11 @@ export const getVideosForChannelHandle = createServerFn({ method: "GET" })
         }),
       )
       .filter((v): v is YouTubeVideo => v !== null);
+
+    return {
+      videos: mapped,
+      hasMore,
+    };
   });
 
 export const syncChannelNow = createServerFn({ method: "POST" })

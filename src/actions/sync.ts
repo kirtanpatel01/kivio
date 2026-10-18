@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { eq, sql } from "drizzle-orm";
 import { db } from "#/db";
-import { channels, videos } from "#/db/schema";
+import { channels, videos, youtubeChannels } from "#/db/schema";
 import { ensureSession } from "#/lib/auth.functions";
 import { getEnvVar } from "#/lib/server-utils";
 import { parseISO8601DurationToSeconds } from "#/lib/utils";
@@ -146,6 +146,13 @@ export async function syncChannelVideosBoundedInternal({
           isShort: sql`excluded.is_short`,
         },
       });
+    // Persist pagination token to allow subsequent bounded batch syncing
+    await db
+      .update(youtubeChannels)
+      .set({
+        nextPageToken: payload.nextPageToken ?? null,
+      })
+      .where(eq(youtubeChannels.channelId, channelId));
   }
 
   console.log(
