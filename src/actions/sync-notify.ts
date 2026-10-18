@@ -51,12 +51,28 @@ export async function syncVideoAndNotifySubscribers(
     const isShort = durationSeconds !== null ? durationSeconds < 180 : null;
     console.log("[WebhookSync] isShort: ", isShort);
 
+    const title = item.snippet?.title || videoId;
+    const publishedAtStr = item.snippet?.publishedAt;
+    const publishedAt = publishedAtStr ? new Date(publishedAtStr) : null;
+    const thumbnail =
+      item.snippet?.thumbnails?.high?.url ||
+      item.snippet?.thumbnails?.medium?.url ||
+      item.snippet?.thumbnails?.default?.url ||
+      "";
+    const duration = durationIso ?? null;
+    const viewCount = item.statistics?.viewCount ?? null;
+
     // 3. Upsert to videos table
     const video = await db
       .insert(videos)
       .values({
         id: videoId,
         channelId,
+        title,
+        publishedAt,
+        thumbnail,
+        duration,
+        viewCount,
         rawVideo: item,
         durationSeconds,
         isShort,
@@ -64,6 +80,11 @@ export async function syncVideoAndNotifySubscribers(
       .onConflictDoUpdate({
         target: videos.id,
         set: {
+          title,
+          publishedAt,
+          thumbnail,
+          duration,
+          viewCount,
           rawVideo: item,
           durationSeconds,
           isShort,

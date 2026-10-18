@@ -73,6 +73,11 @@ export async function syncChannelVideosBoundedInternal({
   type VideoRowInsert = {
     id: string;
     channelId: string;
+    title: string;
+    publishedAt: Date | null;
+    thumbnail: string;
+    duration: string | null;
+    viewCount: string | null;
     rawPlaylistItem: any;
     rawVideo: any;
     durationSeconds: number | null;
@@ -90,9 +95,28 @@ export async function syncChannelVideosBoundedInternal({
       : null;
     const isShort = durationSeconds !== null ? durationSeconds < 180 : null;
 
+    const title = item.snippet?.title || details?.snippet?.title || videoId;
+    const publishedAtStr =
+      item.snippet?.publishedAt ||
+      details?.snippet?.publishedAt ||
+      item.contentDetails?.videoPublishedAt;
+    const publishedAt = publishedAtStr ? new Date(publishedAtStr) : null;
+    const thumbnail =
+      item.snippet?.thumbnails?.high?.url ||
+      item.snippet?.thumbnails?.medium?.url ||
+      details?.snippet?.thumbnails?.high?.url ||
+      "";
+    const duration = durationIso ?? null;
+    const viewCount = details?.statistics?.viewCount ?? null;
+
     return {
       id: videoId,
       channelId,
+      title,
+      publishedAt,
+      thumbnail,
+      duration,
+      viewCount,
       rawPlaylistItem: item,
       rawVideo: details ?? null,
       durationSeconds,
@@ -111,6 +135,11 @@ export async function syncChannelVideosBoundedInternal({
       .onConflictDoUpdate({
         target: videos.id,
         set: {
+          title: sql`excluded.title`,
+          publishedAt: sql`excluded.published_at`,
+          thumbnail: sql`excluded.thumbnail`,
+          duration: sql`excluded.duration`,
+          viewCount: sql`excluded.view_count`,
           rawPlaylistItem: sql`excluded.raw_playlist_item`,
           rawVideo: sql`excluded.raw_video`,
           durationSeconds: sql`excluded.duration_seconds`,

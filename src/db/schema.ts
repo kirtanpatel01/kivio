@@ -1,4 +1,4 @@
-import { relations, sql } from "drizzle-orm";
+import { relations } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -136,31 +136,27 @@ export const videos = pgTable(
     channelId: text("channel_id")
       .notNull()
       .references(() => youtubeChannels.channelId, { onDelete: "cascade" }),
+    title: text("title"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    thumbnail: text("thumbnail"),
+    duration: text("duration"),
+    viewCount: text("view_count"),
+    durationSeconds: integer("duration_seconds"),
+    isShort: boolean("is_short"),
     /**
-     * Exact YouTube API payloads.
-     * These are the source-of-truth; the app derives display fields from them.
+     * Exact YouTube API payloads kept as fallback / raw details.
      */
     rawPlaylistItem: jsonb("raw_playlist_item"),
     rawVideo: jsonb("raw_video"),
-    /**
-     * Derived short classification (duration-only for now).
-     * - `durationSeconds` comes from rawVideo.contentDetails.duration
-     * - `isShort` is true when durationSeconds < 180
-     *
-     * Nullable so migrations can succeed without backfilling existing rows.
-     */
-    durationSeconds: integer("duration_seconds"),
-    isShort: boolean("is_short"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (table) => [
     index("videos_channelId_idx").on(table.channelId),
-    index("videos_channel_pub_text_idx").on(
-      table.channelId,
-      sql`(${table.rawVideo} -> 'snippet' ->> 'publishedAt') desc`,
-    ),
+    index("videos_published_at_idx").on(table.publishedAt.desc()),
+    index("videos_channel_pub_idx").on(table.channelId, table.publishedAt.desc()),
+    index("videos_title_idx").on(table.title),
   ],
 );
 

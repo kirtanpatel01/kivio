@@ -39,6 +39,7 @@ const config = defineConfig({
 	server: {
 		allowedHosts: ["unjuvenilely-nonveritable-kelsie.ngrok-free.dev"],
 	},
+	// @ts-expect-error vitest config
 	test: {
 		exclude: ["**/node_modules/**", "**/dist/**", "**/node-pubsubhubbub/**"],
 	},

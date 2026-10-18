@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ChannelsRouteImport } from './routes/channels'
 import { Route as HistoryRouteImport } from './routes/history'
+import { Route as SearchRouteImport } from './routes/search'
 import { Route as ShortsRouteImport } from './routes/shorts'
 import { Route as PlaylistsPlaylistIdRouteImport } from './routes/playlists/$playlistId'
 import { Route as VideosVideoIdRouteImport } from './routes/videos/$videoId'
@@ -32,6 +33,11 @@ const ChannelsRoute = ChannelsRouteImport.update({
 const HistoryRoute = HistoryRouteImport.update({
   id: '/history',
   path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SearchRoute = SearchRouteImport.update({
+  id: '/search',
+  path: '/search',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShortsRoute = ShortsRouteImport.update({
@@ -69,6 +75,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/channels': typeof ChannelsRoute
   '/history': typeof HistoryRoute
+  '/search': typeof SearchRoute
   '/shorts': typeof ShortsRoute
   '/playlists/$playlistId': typeof PlaylistsPlaylistIdRoute
   '/videos/$videoId': typeof VideosVideoIdRoute
@@ -80,6 +87,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/channels': typeof ChannelsRoute
   '/history': typeof HistoryRoute
+  '/search': typeof SearchRoute
   '/shorts': typeof ShortsRoute
   '/playlists/$playlistId': typeof PlaylistsPlaylistIdRoute
   '/videos/$videoId': typeof VideosVideoIdRoute
@@ -92,6 +100,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/channels': typeof ChannelsRoute
   '/history': typeof HistoryRoute
+  '/search': typeof SearchRoute
   '/shorts': typeof ShortsRoute
   '/playlists/$playlistId': typeof PlaylistsPlaylistIdRoute
   '/videos/$videoId': typeof VideosVideoIdRoute
@@ -105,6 +114,7 @@ export interface FileRouteTypes {
     | '/'
     | '/channels'
     | '/history'
+    | '/search'
     | '/shorts'
     | '/playlists/$playlistId'
     | '/videos/$videoId'
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/'
     | '/channels'
     | '/history'
+    | '/search'
     | '/shorts'
     | '/playlists/$playlistId'
     | '/videos/$videoId'
@@ -127,6 +138,7 @@ export interface FileRouteTypes {
     | '/'
     | '/channels'
     | '/history'
+    | '/search'
     | '/shorts'
     | '/playlists/$playlistId'
     | '/videos/$videoId'
@@ -139,6 +151,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ChannelsRoute: typeof ChannelsRoute
   HistoryRoute: typeof HistoryRoute
+  SearchRoute: typeof SearchRoute
   ShortsRoute: typeof ShortsRoute
   PlaylistsPlaylistIdRoute: typeof PlaylistsPlaylistIdRoute
   VideosVideoIdRoute: typeof VideosVideoIdRoute
@@ -168,6 +181,13 @@ declare module '@tanstack/react-router' {
       path: '/history'
       fullPath: '/history'
       preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/search': {
+      id: '/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof SearchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shorts': {
@@ -219,6 +239,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ChannelsRoute: ChannelsRoute,
   HistoryRoute: HistoryRoute,
+  SearchRoute: SearchRoute,
   ShortsRoute: ShortsRoute,
   PlaylistsPlaylistIdRoute: PlaylistsPlaylistIdRoute,
   VideosVideoIdRoute: VideosVideoIdRoute,

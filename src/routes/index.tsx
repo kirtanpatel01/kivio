@@ -5,9 +5,13 @@ import { z } from "zod";
 import { fetchFeedForUser } from "#/actions/feed";
 import { getUserChannels } from "#/actions/channels";
 import { getWatchedVideoIds } from "#/actions/history";
-import type { YouTubeVideo } from "#/types";
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { IconLoader, IconSearch, IconX } from "@tabler/icons-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  IconLoader,
+  IconSearch,
+  IconX,
+  IconBrandYoutube,
+} from "@tabler/icons-react";
 
 export const Route = createFileRoute("/")({
   validateSearch: (search) =>
@@ -257,27 +261,47 @@ function Dashboard() {
 
       {/* Grid Content */}
       <div className="flex-1 p-4 md:p-8">
-        {/* Search Bar */}
-        <div className="relative max-w-2xl mb-10 group">
-          <IconSearch
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors"
-            size={20}
-          />
-          <input
-            type="text"
-            placeholder="Search within your synced library..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-secondary/20 border border-border/50 rounded-2xl py-3.5 pl-12 pr-12 focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary/40 transition-all text-base font-medium placeholder:text-muted-foreground/50"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-full hover:bg-secondary/80 text-muted-foreground transition-colors"
-            >
-              <IconX size={16} />
-            </button>
-          )}
+        {/* Search Bar & Global YT Search */}
+        <div className="max-w-3xl mb-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {/* Prominently Highlighted Local Library Search */}
+          <div className="relative flex-1 group">
+            <div className="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
+              <IconSearch
+                className="text-muted-foreground group-focus-within:text-primary transition-colors"
+                size={18}
+              />
+              <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary border border-primary/20">
+                Library
+              </span>
+            </div>
+            <input
+              type="text"
+              placeholder="Search within your synced library..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-secondary/20 border border-border/50 rounded-2xl py-3 pl-11 sm:pl-28 pr-10 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary/40 transition-all text-sm font-medium placeholder:text-muted-foreground/60 shadow-inner"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                title="Clear search"
+              >
+                <IconX size={16} />
+              </button>
+            )}
+          </div>
+
+          {/* Small Global YT Search Button */}
+          <Link
+            to="/search"
+            search={{ q: searchQuery || undefined }}
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-2xl bg-secondary/30 hover:bg-secondary/60 border border-border/60 text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-border transition-all shrink-0 active:scale-95 shadow-sm"
+            title="Search all of YouTube (coming soon)"
+          >
+            <IconBrandYoutube size={17} className="text-red-500 shrink-0" />
+            <span>Global YT Search</span>
+          </Link>
         </div>
 
         {videos.length === 0 ? (
