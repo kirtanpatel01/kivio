@@ -3,6 +3,8 @@ import { videos, notifications, channels, youtubeChannels } from "#/db/schema";
 import { eq } from "drizzle-orm";
 import { getEnvVar } from "#/lib/server-utils";
 import { parseISO8601DurationToSeconds } from "#/lib/utils";
+import { notificationEvents, NOTIFICATION_EVENT } from "#/lib/notification-events";
+
 
 /**
  * Syncs a single video by ID and notifies all users who follow its channel.
@@ -111,9 +113,10 @@ export async function syncVideoAndNotifySubscribers(
     console.log("[WebhookSync] notifications table upserted: ", notificationsResult);
 
     // REAL-TIME BROADCAST! 🌪️
-    import("#/lib/notification-events").then(({ notificationEvents, NOTIFICATION_EVENT }) => {
-      notificationEvents.emit(NOTIFICATION_EVENT, { userId: notificationRows[0]?.userId });
-    });
+    const uniqueUserIds = new Set(notificationRows.map((r) => r.userId));
+    for (const subUserId of uniqueUserIds) {
+      notificationEvents.emit(NOTIFICATION_EVENT, { userId: subUserId });
+    }
 
     console.log(
       `[WebhookSync] Successfully synced video and created ${notificationRows.length} notifications.`,

@@ -22,12 +22,15 @@ function ChannelInput() {
     try {
       setAdding(true);
       setError(null);
-      // 2. Call the verification and the DB save
-      await fetchChannelByHandle({ data: normalized });
+      // addUserChannel fetches metadata, saves to DB, and awaits the initial 50 videos
       await addUserChannel({ data: normalized });
 
       setNewChannelName("");
-      router.invalidate(); // Refresh!
+      await router.invalidate();
+      router.navigate({
+        to: "/channels",
+        search: { handle: normalized, tab: "videos" },
+      });
     } catch (err: unknown) {
       setError((err as Error).message || "Failed to add channel");
     } finally {

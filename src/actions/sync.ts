@@ -6,118 +6,140 @@ import { ensureSession } from "#/lib/auth.functions";
 import { getEnvVar } from "#/lib/server-utils";
 import { parseISO8601DurationToSeconds } from "#/lib/utils";
 
+export interface SyncBoundedParams {
+  channelId: string;
+  uploadsPlaylistId: string;
+  limit?: number;
+  pageToken?: string;
+}
+
+export interface SyncBoundedResult {
+  totalSynced: number;
+  nextPageToken?: string;
+}
+
 /**
- * EXHAUSTIVE SYNC: Fetches EVERY video for a channel using YouTube's playlistItems API.
- * This function will keep looping until it finds the very first video ever uploaded.
+ * BOUNDED SYNC: Fetches a single page (up to `limit`, max 50) of videos for a channel.
+ * Designed to execute cleanly within Cloudflare Workers serverless execution bounds (~300ms).
  */
-export const syncChannelVideosExhaustive = createServerFn({ method: "POST" })
+export async function syncChannelVideosBoundedInternal({
+  channelId,
+  uploadsPlaylistId,
+  limit = 50,
+  pageToken,
+}: SyncBoundedParams): Promise<SyncBoundedResult> {
+  const apiKey = getEnvVar("YOUTUBE_API_KEY")?.trim();
+  if (!apiKey) throw new Error("YouTube API Key not configured.");
+
+  const maxResults = Math.min(Math.max(limit, 1), 50);
+
+  let url = `https://www.googleapis.com/youtube/v3/playlistItems?playlistId=${encodeURIComponent(
+    uploadsPlaylistId,
+  )}&part=snippet,contentDetails&key=${apiKey}&maxResults=${maxResults}`;
+  if (pageToken) {
+    url += `&pageToken=${encodeURIComponent(pageToken)}`;
+  }
+
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`YouTube API error: ${await res.text()}`);
+  }
+
+  const payload = await res.json();
+  const items = payload.items || [];
+  if (items.length === 0) {
+    return { totalSynced: 0, nextPageToken: undefined };
+  }
+
+  // 2. Fetch Details (Duration, Views, Likes)
+  const videoIds = items
+    .map((item: any) => item.contentDetails?.videoId)
+    .filter(Boolean)
+    .join(",");
+
+  let detailsMap = new Map<string, any>();
+  if (videoIds) {
+    const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?id=${videoIds}&part=snippet,contentDetails,statistics&key=${apiKey}`;
+    const detailsRes = await fetch(detailsUrl);
+    if (detailsRes.ok) {
+      const detailsData = await detailsRes.json();
+      detailsMap = new Map<string, any>(
+        (detailsData.items || []).map((v: any) => [v.id, v]),
+      );
+    }
+  }
+
+  // 3. Prepare rows and Batch Upsert into DB
+  type VideoRowInsert = {
+    id: string;
+    channelId: string;
+    rawPlaylistItem: any;
+    rawVideo: any;
+    durationSeconds: number | null;
+    isShort: boolean | null;
+  };
+
+  const videoRowsWithNulls = items.map((item: any): VideoRowInsert | null => {
+    const videoId = item.contentDetails?.videoId;
+    if (!videoId) return null;
+    const details = detailsMap.get(videoId);
+
+    const durationIso: string | undefined = details?.contentDetails?.duration;
+    const durationSeconds = durationIso
+      ? parseISO8601DurationToSeconds(durationIso)
+      : null;
+    const isShort = durationSeconds !== null ? durationSeconds < 180 : null;
+
+    return {
+      id: videoId,
+      channelId,
+      rawPlaylistItem: item,
+      rawVideo: details ?? null,
+      durationSeconds,
+      isShort,
+    };
+  });
+
+  const videoRows = videoRowsWithNulls.filter(
+    (row: VideoRowInsert | null): row is VideoRowInsert => row !== null,
+  );
+
+  if (videoRows.length > 0) {
+    await db
+      .insert(videos)
+      .values(videoRows)
+      .onConflictDoUpdate({
+        target: videos.id,
+        set: {
+          rawPlaylistItem: sql`excluded.raw_playlist_item`,
+          rawVideo: sql`excluded.raw_video`,
+          durationSeconds: sql`excluded.duration_seconds`,
+          isShort: sql`excluded.is_short`,
+        },
+      });
+  }
+
+  console.log(
+    `[BoundedSync] Synced ${videoRows.length} videos for channel ${channelId}. Next page token: ${payload.nextPageToken || "none"}`,
+  );
+
+  return {
+    totalSynced: videoRows.length,
+    nextPageToken: payload.nextPageToken,
+  };
+}
+
+export const syncChannelVideosBounded = createServerFn({ method: "POST" })
   .validator(
-    (data: { channelId: string; uploadsPlaylistId: string }) => data,
+    (data: {
+      channelId: string;
+      uploadsPlaylistId: string;
+      limit?: number;
+      pageToken?: string;
+    }) => data,
   )
   .handler(async ({ data }) => {
-    const { channelId, uploadsPlaylistId } = data;
-    const apiKey = getEnvVar("YOUTUBE_API_KEY")?.trim();
-    if (!apiKey) throw new Error("YouTube API Key not configured.");
-
-    let nextPageToken: string | undefined;
-    let totalSynced = 0;
-
-    console.log(`[Sync] Starting exhaustive sync for ${channelId}...`);
-
-    try {
-      do {
-        // 1. Fetch Page (50 videos max)
-        let url = `https://www.googleapis.com/youtube/v3/playlistItems?playlistId=${encodeURIComponent(uploadsPlaylistId)}&part=snippet,contentDetails&key=${apiKey}&maxResults=50`;
-        if (nextPageToken)
-          url += `&pageToken=${encodeURIComponent(nextPageToken)}`;
-
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`YouTube API error: ${await res.text()}`);
-
-        const payload = await res.json();
-        const items = payload.items || [];
-        if (items.length === 0) break;
-
-        // 2. Fetch Details (Duration, Views, Likes, Description)
-        const videoIds = items
-          .map((item: any) => item.contentDetails.videoId)
-          .join(",");
-        const detailsUrl = `https://www.googleapis.com/youtube/v3/videos?id=${videoIds}&part=snippet,contentDetails,statistics&key=${apiKey}`;
-        const detailsRes = await fetch(detailsUrl);
-        const detailsData = await detailsRes.json();
-
-        const detailsMap = new Map<string, any>(
-          detailsData.items.map((v: any) => [v.id, v]),
-        );
-
-        // 3. Prepare and Batch Upsert
-        type VideoRowInsert = {
-          id: string;
-          channelId: string;
-          rawPlaylistItem: any;
-          rawVideo: any;
-          durationSeconds: number | null;
-          isShort: boolean | null;
-        };
-
-        const videoRowsWithNulls = items.map(
-          (item: any): VideoRowInsert | null => {
-            const videoId = item.contentDetails.videoId;
-            const details = detailsMap.get(videoId);
-
-            if (!details) return null;
-
-            const durationIso: string | undefined =
-              details?.contentDetails?.duration;
-            const durationSeconds = durationIso
-              ? parseISO8601DurationToSeconds(durationIso)
-              : null;
-            const isShort =
-              durationSeconds !== null ? durationSeconds < 180 : null;
-
-            return {
-              id: videoId,
-              channelId,
-              // Preserve full payloads from both API calls so we can derive new fields later.
-              rawPlaylistItem: item,
-              rawVideo: details,
-              durationSeconds,
-              isShort,
-            };
-          },
-        );
-
-        const videoRows = videoRowsWithNulls.filter(
-          (row: VideoRowInsert | null): row is VideoRowInsert => row !== null,
-        );
-
-        await db
-          .insert(videos)
-          .values(videoRows)
-          .onConflictDoUpdate({
-            target: videos.id,
-            set: {
-              rawPlaylistItem: sql`excluded.raw_playlist_item`,
-              rawVideo: sql`excluded.raw_video`,
-              durationSeconds: sql`excluded.duration_seconds`,
-              isShort: sql`excluded.is_short`,
-            },
-          });
-
-        totalSynced += items.length;
-        nextPageToken = payload.nextPageToken;
-
-        console.log(`[Sync] Synced ${totalSynced} videos for ${channelId}...`);
-      } while (nextPageToken);
-
-      console.log(
-        `[Sync] Completed. ${totalSynced} videos in database for ${channelId}.`,
-      );
-      return { totalSynced };
-    } catch (error) {
-      console.error(`[Sync] Exhaustive sync failed for ${channelId}:`, error);
-      throw error;
-    }
+    return syncChannelVideosBoundedInternal(data);
   });
 
 export const syncAllSubscribedChannels = createServerFn({
@@ -134,11 +156,10 @@ export const syncAllSubscribedChannels = createServerFn({
 
   for (const uc of userChannels) {
     if (uc.youtubeChannel) {
-      await syncChannelVideosExhaustive({
-        data: {
-          channelId: uc.youtubeChannel.channelId,
-          uploadsPlaylistId: uc.youtubeChannel.uploadsPlaylistId,
-        },
+      await syncChannelVideosBoundedInternal({
+        channelId: uc.youtubeChannel.channelId,
+        uploadsPlaylistId: uc.youtubeChannel.uploadsPlaylistId,
+        limit: 50,
       });
     }
   }

@@ -2,17 +2,19 @@ import {
   IconBrandYoutube,
   IconEye,
   IconInfoCircle,
+  IconRefresh,
   IconSearch,
   IconUsers,
   IconVideo,
   IconX,
 } from "@tabler/icons-react";
-import { getRouteApi, Link, useNavigate } from "@tanstack/react-router";
+import { getRouteApi, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import VideoCard from "#/components/video-card";
 import Avatar from "#/components/Avatar";
 import VideoThumbnail from "#/components/VideoThumbnail";
 import { formatCount, formatDate } from "#/lib/utils";
+import { syncChannelNow } from "#/actions/channels";
 import type {
   YouTubeChannelDetails,
   YouTubePlaylist,
@@ -32,7 +34,22 @@ export default function ChannelDetails() {
       watchedIds: string[];
     };
 
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSync = async () => {
+    if (!details?.id || isSyncing) return;
+    try {
+      setIsSyncing(true);
+      await syncChannelNow({ data: details.id });
+      await router.invalidate();
+    } catch (err) {
+      console.error("[ChannelDetails] Sync failed:", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const setTab = (newTab: "videos" | "shorts" | "playlists") => {
     setSearchQuery(""); // Clear search when switching tabs
@@ -242,10 +259,24 @@ export default function ChannelDetails() {
                     No {tab} found in this channel
                   </p>
                   {tab !== "playlists" && (
-                    <p className="text-xs text-muted-foreground mt-2 max-w-sm mx-auto line-clamp-2">
-                      Videos appear here after they are synced. Use &quot;Sync
-                      All Channels&quot; on the feed if needed.
-                    </p>
+                    <div className="mt-4 flex flex-col items-center gap-2">
+                      <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                        Sync the latest 50 videos from YouTube into your library.
+                      </p>
+                      <button
+                        onClick={handleSync}
+                        disabled={isSyncing}
+                        className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <IconRefresh
+                          size={14}
+                          className={isSyncing ? "animate-spin" : ""}
+                        />
+                        {isSyncing
+                          ? "Syncing latest videos..."
+                          : "Sync Channel Videos"}
+                      </button>
+                    </div>
                   )}
                 </>
               )}

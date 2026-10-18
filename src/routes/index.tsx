@@ -90,19 +90,43 @@ function Dashboard() {
     setVideos(initialVideos);
     setHasMore(initialHasMore);
     setPage(0);
+    setSelectedChannelIds([]);
   }, [initialVideos, initialHasMore]);
 
-  const filteredVideos = useMemo(() => {
-    if (selectedChannelIds.length === 0) return videos;
-    return videos.filter((v: YouTubeVideo) =>
-      selectedChannelIds.includes(v.channelId),
-    );
-  }, [videos, selectedChannelIds]);
+  const fetchFilteredFeed = useCallback(
+    async (channelIds: string[], query?: string) => {
+      setIsFetchingMore(true);
+      try {
+        const result = await fetchFeedForUser({
+          data: {
+            page: 0,
+            q: query || undefined,
+            channelIds: channelIds.length > 0 ? channelIds : undefined,
+          },
+        });
+        setVideos(result.videos);
+        setPage(0);
+        setHasMore(result.hasMore);
+      } catch (err) {
+        console.error("[Dashboard] Error fetching filtered feed:", err);
+      } finally {
+        setIsFetchingMore(false);
+      }
+    },
+    [],
+  );
 
   const toggleChannel = (id: string) => {
-    setSelectedChannelIds((prev: string[]) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
-    );
+    const nextChannels = selectedChannelIds.includes(id)
+      ? selectedChannelIds.filter((i) => i !== id)
+      : [...selectedChannelIds, id];
+    setSelectedChannelIds(nextChannels);
+    fetchFilteredFeed(nextChannels, searchQuery);
+  };
+
+  const handleResetChannels = () => {
+    setSelectedChannelIds([]);
+    fetchFilteredFeed([], searchQuery);
   };
 
   const loadMore = useCallback(async () => {
@@ -111,7 +135,14 @@ function Dashboard() {
     setIsFetchingMore(true);
     try {
       const nextPage = page + 1;
-      const result = await fetchFeedForUser({ data: { page: nextPage } });
+      const result = await fetchFeedForUser({
+        data: {
+          page: nextPage,
+          q: searchQuery || undefined,
+          channelIds:
+            selectedChannelIds.length > 0 ? selectedChannelIds : undefined,
+        },
+      });
       if (result && result.videos.length > 0) {
         setVideos((prev: any[]) => [...prev, ...result.videos]);
         setPage(nextPage);
@@ -124,9 +155,12 @@ function Dashboard() {
     } finally {
       setIsFetchingMore(false);
     }
-  }, [page, hasMore, isFetchingMore]);
+  }, [page, hasMore, isFetchingMore, searchQuery, selectedChannelIds]);
 
   useEffect(() => {
+    // Only observe if there is more to fetch, we're not currently fetching, and we have items
+    if (!hasMore || isFetchingMore || videos.length === 0) return;
+
     const observer = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
@@ -142,7 +176,7 @@ function Dashboard() {
     }
 
     return () => observer.disconnect();
-  }, [loadMore]);
+  }, [loadMore, hasMore, isFetchingMore, videos.length]);
 
   // If the user has NOT followed any channels yet (True Subscription Check)
   if (!followedChannels || followedChannels.length === 0) {
@@ -175,7 +209,7 @@ function Dashboard() {
           </h2>
           {selectedChannelIds.length > 0 && (
             <button
-              onClick={() => setSelectedChannelIds([])}
+              onClick={handleResetChannels}
               className="text-[10px] font-bold text-primary/80 tracking-wider hover:text-primary cursor-pointer transition-colors"
             >
               Reset
@@ -185,7 +219,7 @@ function Dashboard() {
 
         <nav className="flex flex-col gap-2 overflow-y-auto pr-2 custom-scrollbar">
           <button
-            onClick={() => setSelectedChannelIds([])}
+            onClick={handleResetChannels}
             className={`flex items-center p-3 rounded-xl text-sm font-bold border transition-all cursor-pointer ${
               selectedChannelIds.length === 0
                 ? "bg-primary/80 hover:bg-primary border-primary text-primary-foreground shadow-sm shadow-primary/20"
@@ -246,7 +280,7 @@ function Dashboard() {
           )}
         </div>
 
-        {filteredVideos.length === 0 ? (
+        {videos.length === 0 ? (
           <div className="h-[40vh] flex flex-col items-center justify-center text-center space-y-4 animate-in fade-in fade-out duration-300">
             <div className="size-16 rounded-full bg-secondary/20 flex items-center justify-center">
               <IconSearch size={24} className="text-muted-foreground/30" />
@@ -272,7 +306,7 @@ function Dashboard() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-8">
-            {filteredVideos.map((video: any) => (
+            {videos.map((video: any) => (
               <Link
                 to={`/videos/$videoId`}
                 params={{ videoId: video.id }}

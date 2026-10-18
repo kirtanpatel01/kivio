@@ -198,14 +198,16 @@ export const Route = createFileRoute("/api/webhooks/youtube")({
             );
           }
 
-          // Trigger video sync and subscriber notifications in background
+          // Trigger video sync and subscriber notifications
           if (videoId) {
-            syncVideoAndNotifySubscribers(videoId, channelId).catch((err) => {
+            try {
+              await syncVideoAndNotifySubscribers(videoId, channelId);
+            } catch (err) {
               console.error(
-                `[WebhookSync] Background sync failed for video ${videoId}:`,
+                `[WebhookSync] Sync failed for video ${videoId}:`,
                 err,
               );
-            });
+            }
 
             // Return standard WebSub 204 No Content
             return new Response(null, { status: 204 });

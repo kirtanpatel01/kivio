@@ -16,11 +16,18 @@ export const Route = createFileRoute("/api/notifications/stream")({
 
           const stream = new ReadableStream({
             start(controller) {
+              // Immediately flush connection headers to client
+              controller.enqueue(new TextEncoder().encode(": connected\n\n"));
+
               // Create the listener for this user
               const listener = (data: { userId: string }) => {
                 if (data.userId === userId) {
-                  const message = `data: ${JSON.stringify({ type: "refresh" })}\n\n`;
-                  controller.enqueue(new TextEncoder().encode(message));
+                  try {
+                    const message = `data: ${JSON.stringify({ type: "refresh" })}\n\n`;
+                    controller.enqueue(new TextEncoder().encode(message));
+                  } catch {
+                    notificationEvents.off(NOTIFICATION_EVENT, listener);
+                  }
                 }
               };
 
@@ -29,14 +36,22 @@ export const Route = createFileRoute("/api/notifications/stream")({
 
               // Keep-alive heartbeat every 15 seconds to prevent timeouts
               const heartbeat = setInterval(() => {
-                controller.enqueue(new TextEncoder().encode(": heartbeat\n\n"));
+                try {
+                  controller.enqueue(new TextEncoder().encode(": heartbeat\n\n"));
+                } catch {
+                  clearInterval(heartbeat);
+                }
               }, 15000);
 
               // Cleanup when client disconnects
               request.signal.addEventListener("abort", () => {
                 notificationEvents.off(NOTIFICATION_EVENT, listener);
                 clearInterval(heartbeat);
-                controller.close();
+                try {
+                  controller.close();
+                } catch {
+                  // Ignore if already closed
+                }
               });
             },
           });

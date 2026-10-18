@@ -1,12 +1,17 @@
 import { createServerFn } from "@tanstack/react-start";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "#/db";
-import { channels, youtubeChannels } from "#/db/schema";
+import { channels, videos, youtubeChannels } from "#/db/schema";
 import { getSession, ensureSession } from "#/lib/auth.functions";
 import { normalizeHandle } from "#/lib/utils";
 import { fetchChannelByHandle } from "./channel";
+import { syncChannelVideosBoundedInternal } from "./sync";
 import { mapDbVideoToYouTubeVideo } from "./videos";
 import type { YouTubeVideo } from "#/types";
+import {
+  subscribeToChannelWebhooks,
+  unsubscribeFromChannelWebhooks,
+} from "./webhooks";
 
 export const getUserChannels = createServerFn({ method: "GET" }).handler(
   async () => {
@@ -36,11 +41,6 @@ export const getUserChannels = createServerFn({ method: "GET" }).handler(
     }
   },
 );
-
-import {
-  subscribeToChannelWebhooks,
-  unsubscribeFromChannelWebhooks,
-} from "./webhooks";
 
 export const addUserChannel = createServerFn({ method: "POST" })
   .validator((handle: string) => handle)
@@ -182,10 +182,57 @@ export const getVideosForChannelHandle = createServerFn({ method: "GET" })
       WHERE v."channel_id" = ${yc.channelId}
       ${shortFilter}
       ORDER BY (v."raw_video" -> 'snippet' ->> 'publishedAt') DESC
-      LIMIT 36;
+      LIMIT 50;
     `);
 
-    return (result.rows as any[])
+    let rows = result.rows as any[];
+
+    // Auto-sync on first visit: If DB has 0 videos for this channel, fetch the initial 50 videos now!
+    if (rows.length === 0 && yc.uploadsPlaylistId) {
+      const hasAnyVideos = await db.query.videos.findFirst({
+        where: eq(videos.channelId, yc.channelId),
+        columns: { id: true },
+      });
+
+      if (!hasAnyVideos) {
+        try {
+          await syncChannelVideosBoundedInternal({
+            channelId: yc.channelId,
+            uploadsPlaylistId: yc.uploadsPlaylistId,
+            limit: 50,
+          });
+
+          // Re-query newly synced videos
+          const refreshed = await db.execute(sql`
+            SELECT 
+              v."id",
+              v."channel_id" as "channelId",
+              v."duration_seconds" as "durationSeconds",
+              v."is_short" as "isShort",
+              coalesce(v."raw_video" -> 'snippet' ->> 'title', v."raw_playlist_item" -> 'snippet' ->> 'title', v."id") as "title",
+              coalesce(v."raw_video" -> 'snippet' ->> 'publishedAt', v."raw_playlist_item" -> 'contentDetails' ->> 'videoPublishedAt') as "publishedAt",
+              coalesce(
+                v."raw_video" -> 'snippet' -> 'thumbnails' -> 'high' ->> 'url',
+                v."raw_video" -> 'snippet' -> 'thumbnails' -> 'medium' ->> 'url',
+                v."raw_playlist_item" -> 'snippet' -> 'thumbnails' -> 'high' ->> 'url',
+                ''
+              ) as "thumbnail",
+              v."raw_video" -> 'contentDetails' ->> 'duration' as "rawDuration",
+              v."raw_video" -> 'statistics' ->> 'viewCount' as "viewCount"
+            FROM "videos" v
+            WHERE v."channel_id" = ${yc.channelId}
+            ${shortFilter}
+            ORDER BY (v."raw_video" -> 'snippet' ->> 'publishedAt') DESC
+            LIMIT 50;
+          `);
+          rows = refreshed.rows as any[];
+        } catch (syncErr: unknown) {
+          console.error(`[AutoSyncOnVisit] Failed for ${yc.channelId}:`, syncErr);
+        }
+      }
+    }
+
+    return rows
       .map((v) =>
         mapDbVideoToYouTubeVideo(v, {
           title: yc.title,
@@ -193,6 +240,20 @@ export const getVideosForChannelHandle = createServerFn({ method: "GET" })
         }),
       )
       .filter((v): v is YouTubeVideo => v !== null);
+  });
+
+export const syncChannelNow = createServerFn({ method: "POST" })
+  .validator((channelId: string) => channelId)
+  .handler(async ({ data: channelId }) => {
+    const yc = await db.query.youtubeChannels.findFirst({
+      where: eq(youtubeChannels.channelId, channelId),
+    });
+    if (!yc?.uploadsPlaylistId) throw new Error("Channel playlist not found");
+    return syncChannelVideosBoundedInternal({
+      channelId: yc.channelId,
+      uploadsPlaylistId: yc.uploadsPlaylistId,
+      limit: 50,
+    });
   });
 
 export const updateUserChannel = createServerFn({ method: "POST" })

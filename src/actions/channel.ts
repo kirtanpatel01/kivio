@@ -5,7 +5,7 @@ import { youtubeChannels, videos } from "#/db/schema";
 import { getEnvVar } from "#/lib/server-utils";
 import { normalizeHandle } from "#/lib/utils";
 import type { YouTubeChannelDetails } from "#/types";
-import { syncChannelVideosExhaustive } from "./sync";
+import { syncChannelVideosBoundedInternal } from "./sync";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -22,22 +22,23 @@ export const fetchChannelByHandle = createServerFn({ method: "GET" })
     });
 
     if (cached && Date.now() - cached.fetchedAt.getTime() < CACHE_TTL_MS) {
-      // If we have cached channel details but haven't stored any videos yet
-      // (e.g. after schema changes in development), backfill now.
+      // If we have cached channel details but haven't stored any videos yet,
+      // backfill the initial 50 videos now.
       const hasVideos = await db.query.videos.findFirst({
         where: eq(videos.channelId, cached.channelId),
         columns: { id: true },
       });
 
-      if (!hasVideos) {
-        syncChannelVideosExhaustive({
-          data: {
+      if (!hasVideos && cached.uploadsPlaylistId) {
+        try {
+          await syncChannelVideosBoundedInternal({
             channelId: cached.channelId,
             uploadsPlaylistId: cached.uploadsPlaylistId,
-          },
-        }).catch((err: unknown) =>
-          console.error(`[CachedSync] Failed for ${cached.channelId}:`, err),
-        );
+            limit: 50,
+          });
+        } catch (err: unknown) {
+          console.error(`[CachedSync] Failed for ${cached.channelId}:`, err);
+        }
       }
 
       return {
@@ -118,15 +119,18 @@ export const fetchChannelByHandle = createServerFn({ method: "GET" })
           set: { ...row, handle: undefined },
         });
 
-      // 4. Trigger EXHAUSTIVE Sync in background
-      syncChannelVideosExhaustive({
-        data: {
-          channelId: result.id,
-          uploadsPlaylistId: result.uploadsPlaylistId,
-        },
-      }).catch((err: unknown) =>
-        console.error(`[InitialSync] Failed for ${result.id}:`, err),
-      );
+      // 4. Trigger Bounded Initial Sync (await latest 50 videos)
+      if (result.uploadsPlaylistId) {
+        try {
+          await syncChannelVideosBoundedInternal({
+            channelId: result.id,
+            uploadsPlaylistId: result.uploadsPlaylistId,
+            limit: 50,
+          });
+        } catch (syncErr: unknown) {
+          console.error(`[InitialSync] Failed for ${result.id}:`, syncErr);
+        }
+      }
 
       return result;
     } catch (e: unknown) {

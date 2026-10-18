@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from "vite";
 import { devtools } from "@tanstack/devtools-vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
@@ -37,6 +38,9 @@ const config = defineConfig({
 	},
 	server: {
 		allowedHosts: ["unjuvenilely-nonveritable-kelsie.ngrok-free.dev"],
+	},
+	test: {
+		exclude: ["**/node_modules/**", "**/dist/**", "**/node-pubsubhubbub/**"],
 	},
 });
 

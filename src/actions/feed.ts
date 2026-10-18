@@ -8,7 +8,12 @@ import { mapDbVideoToYouTubeVideo } from "./videos";
 
 export const fetchFeedForUser = createServerFn({ method: "GET" })
   .validator(
-    (data?: { page?: number; limit?: number; q?: string }) => data,
+    (data?: {
+      page?: number;
+      limit?: number;
+      q?: string;
+      channelIds?: string[];
+    }) => data,
   )
   .handler(async ({ data }) => {
     const session = await getSession();
@@ -18,6 +23,7 @@ export const fetchFeedForUser = createServerFn({ method: "GET" })
     const page = data?.page ?? 0;
     const limit = data?.limit ?? 20;
     const q = data?.q?.trim();
+    const filterChannelIds = data?.channelIds;
 
     const userChannels = await db.query.channels.findMany({
       where: eq(channels.userId, userId),
@@ -25,16 +31,23 @@ export const fetchFeedForUser = createServerFn({ method: "GET" })
     });
 
     if (userChannels.length === 0) return { videos: [], hasMore: false };
-    const channelIds = userChannels
+    const allChannelIds = userChannels
       .map((uc) => uc.youtubeChannel?.channelId)
       .filter(Boolean) as string[];
+
+    const activeChannelIds =
+      filterChannelIds && filterChannelIds.length > 0
+        ? allChannelIds.filter((id) => filterChannelIds.includes(id))
+        : allChannelIds;
+
+    if (activeChannelIds.length === 0) return { videos: [], hasMore: false };
 
     const searchFilter = q
       ? sql`AND (v."raw_video" -> 'snippet' ->> 'title' ILIKE ${`%${q}%`} OR v."raw_playlist_item" -> 'snippet' ->> 'title' ILIKE ${`%${q}%`})`
       : sql``;
 
     const channelList = sql.join(
-      channelIds.map((id) => sql`${id}`),
+      activeChannelIds.map((id) => sql`${id}`),
       sql`, `,
     );
 

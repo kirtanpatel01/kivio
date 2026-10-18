@@ -25,7 +25,7 @@ export default function NotificationBell() {
 
   // Real-time notification updates via SSE
   useEffect(() => {
-    if (!session?.user) return;
+    if (!session?.user?.id) return;
     const eventSource = new EventSource("/api/notifications/stream");
 
     eventSource.onmessage = (event) => {
@@ -39,14 +39,11 @@ export default function NotificationBell() {
       }
     };
 
-    eventSource.onerror = () => {
-      eventSource.close();
-    };
-
+    // Note: Do not call close() inside onerror, native EventSource automatically reconnects.
     return () => {
       eventSource.close();
     };
-  }, [queryClient]);
+  }, [queryClient, session?.user?.id]);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
