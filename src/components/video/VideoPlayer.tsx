@@ -1,4 +1,5 @@
 import { IconChevronLeft } from "@tabler/icons-react";
+import { useNavigate } from "@tanstack/react-router";
 
 interface VideoPlayerProps {
   videoId: string;
@@ -6,13 +7,23 @@ interface VideoPlayerProps {
 }
 
 export default function VideoPlayer({ videoId, title }: VideoPlayerProps) {
+  const navigate = useNavigate();
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      navigate({ to: "/" });
+    }
+  };
+
   return (
     <div className="space-y-4">
       <button
-        onClick={() => window.history.back()}
-        className="group flex items-center gap-1 pl-2 pr-4 py-2 rounded-full bg-secondary/80 hover:bg-secondary text-sm font-medium cursor-pointer"
+        onClick={handleBack}
+        className="group inline-flex items-center gap-1.5 pl-2.5 pr-4 py-1.5 rounded-full bg-secondary/70 hover:bg-secondary text-sm font-medium cursor-pointer transition-colors shadow-xs"
       >
-        <IconChevronLeft size={18} className="group-hover:-translate-x-px" />
+        <IconChevronLeft size={18} className="group-hover:-translate-x-0.5 transition-transform" />
         Back
       </button>
 

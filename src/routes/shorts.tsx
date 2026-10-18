@@ -16,8 +16,8 @@ const shortsSearchSchema = z.object({
 
 export const Route = createFileRoute("/shorts")({
   validateSearch: (search) => shortsSearchSchema.parse(search),
-  loaderDeps: ({ search: { v } }) => ({ v }),
-  loader: async ({ deps: { v } }) => {
+  loader: async ({ location }) => {
+    const v = (location.search as { v?: string })?.v;
     const feed = await fetchShortsForUser({ data: { currentVideoId: v } });
     return {
       videos: feed?.videos || [],

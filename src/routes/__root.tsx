@@ -1,7 +1,9 @@
 import {
   HeadContent,
+  Link,
   Scripts,
   createRootRoute,
+  useRouter,
   useRouterState,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
@@ -76,30 +78,102 @@ export const Route = createRootRoute({
   shellComponent: RootDocument,
 });
 
-function AppError({ error }: { error: any }) {
+import {
+  IconAlertTriangle,
+  IconRefresh,
+  IconHome,
+  IconCompass,
+  IconDeviceTv,
+} from "@tabler/icons-react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "../lib/query";
+import TopProgressBar from "../components/TopProgressBar";
+
+function AppError({ error }: { error: unknown }) {
+  const router = useRouter();
+  const errorMessage =
+    error instanceof Error ? error.message : "An unexpected error occurred.";
+
   return (
-    <div className="h-[80vh] flex items-center justify-center p-6 text-center">
-      <p className="text-red-500 font-medium">
-        Something went wrong:{" "}
-        {error?.message || "An unexpected error occurred."}
-      </p>
+    <div className="min-h-[80vh] flex items-center justify-center p-6">
+      <div className="max-w-md w-full bg-secondary/15 border border-border/60 rounded-3xl p-8 sm:p-10 text-center flex flex-col items-center gap-6 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
+        <div className="size-16 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center border border-destructive/20 shadow-inner">
+          <IconAlertTriangle size={34} stroke={1.8} />
+        </div>
+
+        <div className="space-y-2">
+          <h2 className="text-xl font-bold tracking-tight">Something went wrong</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed line-clamp-3">
+            {errorMessage}
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full pt-2">
+          <button
+            onClick={() => router.invalidate()}
+            className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-xs sm:text-sm hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-md shadow-primary/25 cursor-pointer"
+          >
+            <IconRefresh size={16} />
+            Try Again
+          </button>
+          <Link
+            to="/"
+            className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-secondary/50 hover:bg-secondary/80 text-foreground font-semibold text-xs sm:text-sm transition-colors border border-border/40"
+          >
+            <IconHome size={16} />
+            Return Home
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
 
 function PageNotFound() {
   return (
-    <div className="h-[80vh] flex flex-col items-center justify-center p-6 text-center gap-4">
-      <p className="text-xl font-bold italic tracking-tight uppercase">
-        404 - Not Found
-      </p>
+    <div className="min-h-[80vh] flex items-center justify-center p-6">
+      <div className="max-w-md w-full bg-secondary/15 border border-border/60 rounded-3xl p-8 sm:p-10 text-center flex flex-col items-center gap-6 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
+        <div className="size-20 rounded-3xl bg-primary/10 text-primary flex items-center justify-center shadow-inner border border-primary/20">
+          <span className="text-3xl font-black tracking-tight">404</span>
+        </div>
+
+        <div className="space-y-2">
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Page Not Found</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+            The link you followed may be broken, or the page may have been moved or removed.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2.5 w-full pt-2">
+          <Link
+            to="/"
+            className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-xs sm:text-sm hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-md shadow-primary/25"
+          >
+            <IconHome size={16} />
+            Return to Feed
+          </Link>
+          <div className="flex items-center gap-2 w-full">
+            <Link
+              to="/channels"
+              search={{ tab: "videos" }}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-secondary/40 hover:bg-secondary/70 text-foreground text-xs font-semibold transition-colors border border-border/40"
+            >
+              <IconDeviceTv size={14} />
+              Channels
+            </Link>
+            <Link
+              to="/shorts"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-secondary/40 hover:bg-secondary/70 text-foreground text-xs font-semibold transition-colors border border-border/40"
+            >
+              <IconCompass size={14} />
+              Shorts
+            </Link>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
-
-import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "../lib/query";
-import TopProgressBar from "../components/TopProgressBar";
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   const isShorts = useRouterState({

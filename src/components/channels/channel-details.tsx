@@ -22,6 +22,7 @@ import {
   useInfiniteQuery,
   keepPreviousData,
 } from "@tanstack/react-query";
+import { motion } from "motion/react";
 import VideoCard from "#/components/video-card";
 import Avatar from "#/components/Avatar";
 import VideoThumbnail from "#/components/VideoThumbnail";
@@ -430,40 +431,31 @@ export default function ChannelDetails() {
               )}
             </div>
 
-            <div className="flex rounded-xl border border-border/60 bg-secondary/10 p-1 gap-1">
-              <button
-                type="button"
-                onClick={() => setTab("videos")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                  tab === "videos"
-                    ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-                    : "text-foreground/70 hover:bg-secondary/60"
-                }`}
-              >
-                Videos
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab("shorts")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                  tab === "shorts"
-                    ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-                    : "text-foreground/70 hover:bg-secondary/60"
-                }`}
-              >
-                Shorts
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab("playlists")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                  tab === "playlists"
-                    ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-                    : "text-foreground/70 hover:bg-secondary/60"
-                }`}
-              >
-                Playlists
-              </button>
+            <div className="flex rounded-xl border border-border/60 bg-secondary/15 p-1 gap-1 relative">
+              {(["videos", "shorts", "playlists"] as const).map((tabKey) => {
+                const isActive = tab === tabKey;
+                return (
+                  <button
+                    key={tabKey}
+                    type="button"
+                    onClick={() => setTab(tabKey)}
+                    className={`relative px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors capitalize z-10 cursor-pointer ${
+                      isActive
+                        ? "text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {isActive && (
+                      <motion.div
+                        layoutId="channel-tab-pill"
+                        className="absolute inset-0 bg-primary rounded-lg -z-10 shadow-sm shadow-primary/25"
+                        transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                      />
+                    )}
+                    {tabKey}
+                  </button>
+                );
+              })}
             </div>
           </div>
           {filteredData.length === 0 ? (

@@ -11,8 +11,9 @@ export function getRouter() {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
-    defaultPreload: false,
-    defaultPreloadStaleTime: 30_000,
+    defaultPreload: "intent",
+    defaultPreloadDelay: 50,
+    defaultPreloadStaleTime: 0,
 
     defaultErrorComponent: ({ error }) => <ErrorComponent error={error} />,
   });

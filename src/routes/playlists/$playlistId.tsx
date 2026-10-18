@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { fetchPlaylistById, fetchPlaylistVideos } from "#/actions/playlists";
 import { fetchChannelById } from "#/actions/channel";
 import VideoCard from "#/components/video-card";
@@ -39,6 +39,15 @@ export const Route = createFileRoute("/playlists/$playlistId")({
 
 function PlaylistPage() {
   const { playlist, videos } = Route.useLoaderData();
+  const navigate = useNavigate();
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      navigate({ to: "/channels", search: { tab: "playlists" } });
+    }
+  };
 
   if (!playlist) {
     return (
@@ -62,12 +71,12 @@ function PlaylistPage() {
       <header className="shrink-0 border-b border-border/60 bg-background/80 backdrop-blur-sm px-4 py-6 sm:px-10">
         <div className="max-w-[1600px] mx-auto space-y-6">
           <button
-            onClick={() => window.history.back()}
-            className="group flex items-center gap-1 pl-2 pr-4 py-2 rounded-full bg-secondary/60 hover:bg-secondary text-sm font-medium cursor-pointer transition-colors w-fit"
+            onClick={handleBack}
+            className="group flex items-center gap-1.5 pl-2.5 pr-4 py-1.5 rounded-full bg-secondary/60 hover:bg-secondary text-sm font-medium cursor-pointer transition-colors w-fit"
           >
             <IconChevronLeft
               size={18}
-              className="group-hover:-translate-x-px"
+              className="group-hover:-translate-x-0.5 transition-transform"
             />
             Back
           </button>

@@ -83,6 +83,7 @@ function Dashboard() {
       setDebouncedQuery(searchQuery);
       navigate({
         search: (prev) => ({ ...prev, q: searchQuery || undefined }),
+        replace: true,
       });
     }, 300);
     return () => clearTimeout(timer);

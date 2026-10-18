@@ -112,6 +112,18 @@ function RouteComponent() {
         <div className="max-w-7xl mx-auto p-3 sm:p-4 space-y-4">
           <VideoPlayer videoId={video.id} title={video.title} />
           <VideoDetails video={video} />
+
+          {/* Mobile/Tablet Suggestions & Playlist */}
+          <div className="block lg:hidden pt-4 border-t border-border/50">
+            <Sidebar
+              currentVideoId={video.id}
+              playlist={playlist}
+              playlistVideos={playlistVideos}
+              suggestions={filteredSuggestions}
+              watchedIds={watchedIds}
+              isMobile
+            />
+          </div>
         </div>
       </div>
 

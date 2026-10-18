@@ -9,6 +9,7 @@ interface SidebarProps {
   playlistVideos: YouTubeVideo[];
   suggestions: YouTubeVideo[];
   watchedIds: string[];
+  isMobile?: boolean;
 }
 
 export default function Sidebar({
@@ -17,9 +18,16 @@ export default function Sidebar({
   playlistVideos,
   suggestions,
   watchedIds,
+  isMobile,
 }: SidebarProps) {
   return (
-    <div className="hidden lg:flex flex-col w-[400px] h-full overflow-y-auto custom-scrollbar bg-secondary/5 px-2 py-4 space-y-4">
+    <div
+      className={
+        isMobile
+          ? "flex flex-col w-full pb-8 space-y-4"
+          : "hidden lg:flex flex-col w-[400px] h-full overflow-y-auto custom-scrollbar bg-secondary/5 px-2 py-4 space-y-4"
+      }
+    >
       {playlist && (
         <div className="flex flex-col gap-2 mb-6">
           <div className="px-2 py-3 bg-secondary/30 rounded-xl mb-2">

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { IconChevronDown } from "@tabler/icons-react";
+import { Link } from "@tanstack/react-router";
 import { formatCount } from "#/lib/utils";
 import type { YouTubeVideo } from "#/types";
 import { LinkifiedText } from "./LinkifiedText";
@@ -22,21 +23,25 @@ export default function VideoDetails({ video }: VideoDetailsProps) {
           </h1>
 
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3 cursor-pointer group">
+            <Link
+              to="/channels"
+              search={{ handle: video.channelTitle, tab: "videos" }}
+              className="flex items-center gap-3 cursor-pointer group hover:opacity-90 transition-opacity"
+            >
               <Avatar
                 src={video.channelAvatar}
                 name={video.channelTitle}
-                className="w-12 h-12 rounded-full border-2 border-transparent group-hover:border-primary object-cover text-sm font-bold"
+                className="w-12 h-12 rounded-full border-2 border-transparent group-hover:border-primary object-cover text-sm font-bold transition-colors"
               />
               <div>
-                <h2 className="font-semibold text-sm sm:text-base">
+                <h2 className="font-semibold text-sm sm:text-base group-hover:text-primary transition-colors">
                   {video.channelTitle}
                 </h2>
                 <p className="text-xs text-foreground-secondary tracking-wider">
                   {formatCount(video.subscriberCount || 0)} Subscribers
                 </p>
               </div>
-            </div>
+            </Link>
 
             <div className="border-l border-primary/30 pl-4 flex flex-col gap-0.5 text-sm">
               <span className="font-semibold">
