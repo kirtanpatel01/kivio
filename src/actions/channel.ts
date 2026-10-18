@@ -59,6 +59,7 @@ export const fetchChannelByHandle = createServerFn({ method: "GET" })
           videoCount: cached.videoCount,
         },
         uploadsPlaylistId: cached.uploadsPlaylistId,
+        nextPageToken: cached.nextPageToken,
       } as YouTubeChannelDetails;
     }
 

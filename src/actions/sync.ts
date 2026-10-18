@@ -48,6 +48,11 @@ export async function syncChannelVideosBoundedInternal({
   const payload = await res.json();
   const items = payload.items || [];
   if (items.length === 0) {
+    // Reached the end of the playlist on YouTube — clear token in DB
+    await db
+      .update(youtubeChannels)
+      .set({ nextPageToken: null })
+      .where(eq(youtubeChannels.channelId, channelId));
     return { totalSynced: 0, nextPageToken: undefined };
   }
 
@@ -147,6 +152,14 @@ export async function syncChannelVideosBoundedInternal({
         },
       });
     // Persist pagination token to allow subsequent bounded batch syncing
+    await db
+      .update(youtubeChannels)
+      .set({
+        nextPageToken: payload.nextPageToken ?? null,
+      })
+      .where(eq(youtubeChannels.channelId, channelId));
+  } else {
+    // If all items were filtered out (e.g. private/deleted videos), still update token or clear it
     await db
       .update(youtubeChannels)
       .set({

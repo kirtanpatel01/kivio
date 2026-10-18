@@ -16,6 +16,7 @@ export interface YouTubeChannelDetails {
     videoCount: string;
   };
   uploadsPlaylistId: string;
+  nextPageToken?: string | null;
 }
 
 export interface YouTubeVideo {

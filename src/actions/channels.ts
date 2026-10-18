@@ -368,13 +368,49 @@ export const syncChannelNextBatch = createServerFn({ method: "POST" })
     `);
     const totalAfter = (updatedCountRes.rows[0] as any)?.total ?? 0;
 
-    const isComplete = !syncRes.nextPageToken || totalAfter >= expectedTotal;
+    // If YouTube returned no token, OR no videos were synced in this batch, or we reached/exceeded expected, we're complete
+    const isComplete =
+      !syncRes.nextPageToken ||
+      syncRes.totalSynced === 0 ||
+      syncRes.nextPageToken === pageToken ||
+      totalAfter >= expectedTotal;
+
+    if (isComplete && syncRes.nextPageToken) {
+      // Clear token in DB so it doesn't try to loop again
+      await db
+        .update(youtubeChannels)
+        .set({ nextPageToken: null })
+        .where(eq(youtubeChannels.channelId, yc.channelId));
+    }
 
     return {
       syncedInBatch: syncRes.totalSynced,
       totalInDb: totalAfter,
-      nextPageToken: syncRes.nextPageToken ?? null,
+      nextPageToken: isComplete ? null : (syncRes.nextPageToken ?? null),
       isComplete,
+    };
+  });
+
+export const getChannelStats = createServerFn({ method: "GET" })
+  .validator((channelId: string) => channelId)
+  .handler(async ({ data: channelId }) => {
+    const yc = await db.query.youtubeChannels.findFirst({
+      where: eq(youtubeChannels.channelId, channelId),
+      columns: { channelId: true, videoCount: true, nextPageToken: true },
+    });
+    if (!yc) return { totalInDb: 0, expectedTotal: 0, isAllSynced: true };
+
+    const countRes = await db.execute(sql`
+      SELECT count(*)::int as total FROM "videos" WHERE "channel_id" = ${yc.channelId}
+    `);
+    const totalInDb = (countRes.rows[0] as any)?.total ?? 0;
+    const expectedTotal = parseInt(yc.videoCount, 10) || 0;
+    const isAllSynced = totalInDb >= expectedTotal || !yc.nextPageToken;
+
+    return {
+      totalInDb,
+      expectedTotal,
+      isAllSynced,
     };
   });
 

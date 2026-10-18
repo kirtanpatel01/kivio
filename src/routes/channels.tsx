@@ -1,7 +1,7 @@
 import { IconLoader } from "@tabler/icons-react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { z } from "zod";
-import { getUserChannels, getVideosForChannelHandle } from "#/actions/channels";
+import { getUserChannels, getVideosForChannelHandle, getChannelStats } from "#/actions/channels";
 import { getWatchedVideoIds } from "#/actions/history";
 import { fetchChannelByHandle } from "#/actions/channel";
 import { fetchPlaylistsByHandle } from "#/actions/playlists";
@@ -64,12 +64,22 @@ export const Route = createFileRoute("/channels")({
         : Promise.resolve([]),
       getWatchedVideoIds(),
     ]);
+
+    let channelTotalInDb = videoResult?.totalInDb ?? 0;
+    let isAllSyncedFromDb = false;
+    if (details?.id) {
+      const stats = await getChannelStats({ data: details.id });
+      channelTotalInDb = stats.totalInDb;
+      isAllSyncedFromDb = stats.isAllSynced;
+    }
+
     return {
       channels,
       details,
       channelVideos: videoResult && "videos" in videoResult ? videoResult.videos : [],
       initialHasMore: videoResult && "hasMore" in videoResult ? videoResult.hasMore : false,
-      initialTotalInDb: videoResult && "totalInDb" in videoResult ? (videoResult.totalInDb as number) : 0,
+      initialTotalInDb: channelTotalInDb,
+      initialIsAllSynced: isAllSyncedFromDb,
       playlists: playlists ?? [],
       watchedIds: watchedIds ?? [],
       isLoggedIn: !!session?.user,

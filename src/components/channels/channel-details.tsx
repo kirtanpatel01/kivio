@@ -38,12 +38,13 @@ const routeApi = getRouteApi("/channels");
 export default function ChannelDetails() {
   const { handle, tab } = routeApi.useSearch();
   const navigate = useNavigate({ from: "/channels" });
-  const { details, channelVideos, initialHasMore, initialTotalInDb, playlists, watchedIds } =
+  const { details, channelVideos, initialHasMore, initialTotalInDb, initialIsAllSynced, playlists, watchedIds } =
     routeApi.useLoaderData() as {
       details: YouTubeChannelDetails | null;
       channelVideos: YouTubeVideo[];
       initialHasMore?: boolean;
       initialTotalInDb?: number;
+      initialIsAllSynced?: boolean;
       playlists: YouTubePlaylist[];
       watchedIds: string[];
     };
@@ -53,6 +54,7 @@ export default function ChannelDetails() {
   const [hasMore, setHasMore] = useState(initialHasMore ?? false);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [syncedCount, setSyncedCount] = useState<number>(initialTotalInDb ?? (channelVideos?.length ?? 0));
+  const [isAllSyncedState, setIsAllSyncedState] = useState<boolean>(initialIsAllSynced ?? false);
   const [isSyncingAll, setIsSyncingAll] = useState(false);
   const stopSyncRef = useRef(false);
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -63,11 +65,16 @@ export default function ChannelDetails() {
   useEffect(() => {
     setVideos(channelVideos ?? []);
     setHasMore(initialHasMore ?? false);
-    setSyncedCount(initialTotalInDb ?? (channelVideos?.length ?? 0));
+    if (initialTotalInDb !== undefined) {
+      setSyncedCount(initialTotalInDb);
+    }
+    if (initialIsAllSynced !== undefined) {
+      setIsAllSyncedState(initialIsAllSynced);
+    }
     setSearchQuery("");
     setIsSyncingAll(false);
     stopSyncRef.current = true;
-  }, [channelVideos, initialHasMore, initialTotalInDb, handle, tab]);
+  }, [channelVideos, initialHasMore, initialTotalInDb, initialIsAllSynced, handle, tab]);
 
   // Server-side search debounce for channel videos
   useEffect(() => {
@@ -191,6 +198,7 @@ export default function ChannelDetails() {
         setSyncedCount(res.totalInDb);
 
         if (res.isComplete || !res.nextPageToken) {
+          setIsAllSyncedState(true);
           break;
         }
 
@@ -332,7 +340,7 @@ export default function ChannelDetails() {
             {(() => {
               const totalVideos = parseInt(details.statistics.videoCount, 10) || 0;
               const remaining = Math.max(0, totalVideos - syncedCount);
-              const isAllSynced = totalVideos > 0 && remaining === 0;
+              const isAllSynced = isAllSyncedState || (totalVideos > 0 && remaining === 0);
               const progressPercent =
                 totalVideos > 0
                   ? Math.min(100, Math.round((syncedCount / totalVideos) * 100))
