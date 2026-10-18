@@ -21,17 +21,13 @@ import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import {
   useInfiniteQuery,
   keepPreviousData,
-  useQueryClient,
 } from "@tanstack/react-query";
 import VideoCard from "#/components/video-card";
 import Avatar from "#/components/Avatar";
 import VideoThumbnail from "#/components/VideoThumbnail";
 import { formatCount, formatDate } from "#/lib/utils";
-import {
-  getVideosForChannelHandle,
-  syncChannelNextBatch,
-  syncChannelNow,
-} from "#/actions/channels";
+import { getVideosForChannelHandle } from "#/actions/channels";
+import { useSyncStore } from "#/stores/sync-store";
 import type {
   YouTubeChannelDetails,
   YouTubePlaylist,
@@ -55,15 +51,36 @@ export default function ChannelDetails() {
     };
 
   const router = useRouter();
-  const queryClient = useQueryClient();
-  const [syncedCount, setSyncedCount] = useState<number>(initialTotalInDb ?? (channelVideos?.length ?? 0));
-  const [isAllSyncedState, setIsAllSyncedState] = useState<boolean>(initialIsAllSynced ?? false);
-  const [isSyncingAll, setIsSyncingAll] = useState(false);
-  const stopSyncRef = useRef(false);
+  const channelId = details?.id;
+  const totalVideos = parseInt(details?.statistics?.videoCount || "0", 10) || 0;
+
+  // Global Zustand sync state (persists across tab switching and component remounts)
+  const syncStatus = useSyncStore((s) => (channelId ? s.channels[channelId] : undefined));
+  const initChannelStats = useSyncStore((s) => s.initChannelStats);
+  const startSyncAll = useSyncStore((s) => s.startSyncAll);
+  const stopSyncAll = useSyncStore((s) => s.stopSyncAll);
+  const syncSingleNow = useSyncStore((s) => s.syncSingleNow);
+  const [isSyncingSingle, setIsSyncingSingle] = useState(false);
+  const isSyncing = isSyncingSingle;
+
+  // Initialize store baseline safely when channel or initialTotalInDb changes
+  // (initChannelStats safely ignores updates if a sync is actively running)
+  useEffect(() => {
+    if (channelId && initialTotalInDb !== undefined) {
+      initChannelStats(channelId, initialTotalInDb, initialIsAllSynced ?? false, totalVideos);
+    }
+  }, [channelId, initialTotalInDb, initialIsAllSynced, totalVideos, initChannelStats]);
+
+  // Derived sync stats directly from store (or loader initial baseline if store not yet populated)
+  const syncedCount = syncStatus?.syncedCount ?? initialTotalInDb ?? (channelVideos?.length ?? 0);
+  const isSyncingAll = syncStatus?.isSyncing ?? false;
+  const isAllSyncedState =
+    (syncStatus?.isAllSynced ?? initialIsAllSynced ?? false) ||
+    (totalVideos > 0 && syncedCount >= totalVideos);
+
   const observerTarget = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [isSyncing, setIsSyncing] = useState(false);
 
   // Debounce search query
   useEffect(() => {
@@ -124,17 +141,6 @@ export default function ChannelDetails() {
     return channelVideos ?? [];
   }, [videosData, channelVideos, tab]);
 
-  // Reset CHANNEL-LEVEL sync stats ONLY when the channel (handle) changes — never on tab switch
-  useEffect(() => {
-    if (initialTotalInDb !== undefined) {
-      setSyncedCount(initialTotalInDb);
-    }
-    if (initialIsAllSynced !== undefined) {
-      setIsAllSyncedState(initialIsAllSynced);
-    }
-    setIsSyncingAll(false);
-    stopSyncRef.current = true;
-  }, [handle, initialTotalInDb, initialIsAllSynced]);
 
   const loadMore = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage && tab !== "playlists" && !!handle) {
@@ -183,58 +189,26 @@ export default function ChannelDetails() {
   }, [loadMore, hasNextPage, isFetchingNextPage, tab]);
 
   const handleSync = async () => {
-    if (!details?.id || isSyncing) return;
+    if (!channelId || isSyncingSingle || isSyncingAll) return;
     try {
-      setIsSyncing(true);
-      await syncChannelNow({ data: details.id });
-      if (handle) {
-        await queryClient.invalidateQueries({
-          queryKey: ["channel-videos", handle],
-        });
-      }
+      setIsSyncingSingle(true);
+      await syncSingleNow(channelId, handle || "");
       await router.invalidate();
     } catch (err) {
       console.error("[ChannelDetails] Sync failed:", err);
     } finally {
-      setIsSyncing(false);
+      setIsSyncingSingle(false);
     }
   };
 
-  const handleSyncAll = async () => {
-    if (!details?.id || isSyncingAll) return;
-    setIsSyncingAll(true);
-    stopSyncRef.current = false;
-
-    try {
-      while (!stopSyncRef.current) {
-        const res = await syncChannelNextBatch({ data: details.id });
-        setSyncedCount(res.totalInDb);
-
-        if (res.isComplete || !res.nextPageToken) {
-          setIsAllSyncedState(true);
-          break;
-        }
-
-        // Brief 150ms delay between batches for UI smoothness and rate limit respect
-        await new Promise((resolve) => setTimeout(resolve, 150));
-      }
-
-      // Re-fetch the channel videos in TanStack Query so newly synced videos appear immediately
-      if (handle) {
-        await queryClient.invalidateQueries({
-          queryKey: ["channel-videos", handle],
-        });
-      }
-    } catch (err) {
-      console.error("[ChannelDetails] Sync All error:", err);
-    } finally {
-      setIsSyncingAll(false);
-    }
+  const handleSyncAll = () => {
+    if (!channelId || isSyncingAll || !handle) return;
+    startSyncAll(channelId, handle, totalVideos);
   };
 
   const handleStopSyncAll = () => {
-    stopSyncRef.current = true;
-    setIsSyncingAll(false);
+    if (!channelId) return;
+    stopSyncAll(channelId);
   };
 
   const setTab = (newTab: "videos" | "shorts" | "playlists") => {
