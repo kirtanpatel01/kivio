@@ -38,7 +38,6 @@ export default function ChannelDetails() {
 
   const router = useRouter();
   const [videos, setVideos] = useState<YouTubeVideo[]>(channelVideos ?? []);
-  const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(initialHasMore ?? false);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -49,7 +48,6 @@ export default function ChannelDetails() {
   useEffect(() => {
     setVideos(channelVideos ?? []);
     setHasMore(initialHasMore ?? false);
-    setPage(0);
     setSearchQuery("");
   }, [channelVideos, initialHasMore, handle, tab]);
 
@@ -63,13 +61,12 @@ export default function ChannelDetails() {
           data: {
             handle,
             isShort: tab === "shorts",
-            page: 0,
+            offset: 0,
             limit: 50,
             q: searchQuery || undefined,
           },
         });
         setVideos(res.videos);
-        setPage(0);
         setHasMore(res.hasMore);
       } catch (err) {
         console.error("[ChannelDetails] Search error:", err);
@@ -85,57 +82,78 @@ export default function ChannelDetails() {
 
     setIsFetchingMore(true);
     try {
-      const nextPage = page + 1;
       const res = await getVideosForChannelHandle({
         data: {
           handle,
           isShort: tab === "shorts",
-          page: nextPage,
+          offset: videos.length,
           limit: 50,
           q: searchQuery || undefined,
         },
       });
 
       if (res && res.videos && res.videos.length > 0) {
-        setVideos((prev) => [...prev, ...res.videos]);
-        setPage(nextPage);
+        setVideos((prev) => {
+          const existingIds = new Set(prev.map((v) => v.id));
+          const fresh = res.videos.filter((v) => !existingIds.has(v.id));
+          return [...prev, ...fresh];
+        });
         setHasMore(res.hasMore);
       } else {
-        setHasMore(false);
+        setHasMore(res?.hasMore ?? false);
       }
     } catch (err) {
       console.error("[ChannelDetails] Error loading more videos:", err);
     } finally {
       setIsFetchingMore(false);
     }
-  }, [page, hasMore, isFetchingMore, tab, handle, searchQuery]);
+  }, [isFetchingMore, hasMore, tab, handle, videos.length, searchQuery]);
 
   useEffect(() => {
-    if (!hasMore || isFetchingMore || tab === "playlists" || videos.length === 0) return;
+    if (!hasMore || isFetchingMore || tab === "playlists") return;
 
+    // 1. Intersection Observer with threshold 0 and rootMargin to trigger before hitting the bottom
     const observer = new IntersectionObserver(
       (entries) => {
-        const entry = entries[0];
-        if (entry && entry.isIntersecting) {
+        if (entries[0]?.isIntersecting) {
           loadMore();
         }
       },
-      { threshold: 0.1 },
+      { threshold: 0, rootMargin: "300px" },
     );
 
     if (observerTarget.current) {
       observer.observe(observerTarget.current);
     }
 
-    return () => observer.disconnect();
-  }, [loadMore, hasMore, isFetchingMore, tab, videos.length]);
+    // 2. Direct scroll listener on scroll container (.overflow-y-auto)
+    const container = observerTarget.current?.closest(".overflow-y-auto");
+    const onScroll = () => {
+      if (!container) return;
+      const scrollBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+      if (scrollBottom < 400) {
+        loadMore();
+      }
+    };
+
+    if (container) {
+      container.addEventListener("scroll", onScroll, { passive: true });
+    }
+
+    return () => {
+      observer.disconnect();
+      if (container) {
+        container.removeEventListener("scroll", onScroll);
+      }
+    };
+  }, [loadMore, hasMore, isFetchingMore, tab]);
 
   const handleSync = async () => {
     if (!details?.id || isSyncing) return;
     try {
       setIsSyncing(true);
       await syncChannelNow({ data: details.id });
-      setPage(0);
       await router.invalidate();
     } catch (err) {
       console.error("[ChannelDetails] Sync failed:", err);
@@ -433,9 +451,11 @@ export default function ChannelDetails() {
               ) : hasMore ? (
                 <button
                   onClick={loadMore}
-                  className="text-xs font-semibold text-primary/80 hover:text-primary transition-colors py-2 px-4 rounded-xl border border-primary/20 hover:border-primary/40 bg-primary/5 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+                  disabled={isFetchingMore}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-xl text-xs font-bold transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98] border border-primary/20"
                 >
-                  Load more videos
+                  <IconRefresh size={14} />
+                  <span>Load more videos</span>
                 </button>
               ) : videos.length > 0 ? (
                 <p className="text-xs text-muted-foreground/50 font-medium">

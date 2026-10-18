@@ -138,6 +138,7 @@ export const getVideosForChannelHandle = createServerFn({ method: "GET" })
             handle: string;
             isShort?: boolean;
             page?: number;
+            offset?: number;
             limit?: number;
             q?: string;
           },
@@ -146,8 +147,11 @@ export const getVideosForChannelHandle = createServerFn({ method: "GET" })
   .handler(async ({ data: input }) => {
     const handle = typeof input === "string" ? input : input.handle;
     const isShort = typeof input === "object" ? input.isShort : undefined;
-    const page = typeof input === "object" ? (input.page ?? 0) : 0;
     const limit = typeof input === "object" ? (input.limit ?? 50) : 50;
+    const offset =
+      typeof input === "object"
+        ? (input.offset ?? (input.page !== undefined ? input.page * limit : 0))
+        : 0;
     const q = typeof input === "object" ? input.q?.trim() : undefined;
 
     const session = await getSession();
@@ -197,7 +201,7 @@ export const getVideosForChannelHandle = createServerFn({ method: "GET" })
         ${searchFilter}
         ORDER BY v."published_at" DESC NULLS LAST
         LIMIT ${limit + 1}
-        OFFSET ${page * limit};
+        OFFSET ${offset};
       `);
       return result.rows as any[];
     };
@@ -205,7 +209,7 @@ export const getVideosForChannelHandle = createServerFn({ method: "GET" })
     let rows = await queryPage();
 
     // Auto-sync on first visit: If DB has 0 videos for this channel, fetch the initial 50 videos now!
-    if (rows.length === 0 && page === 0 && !q && yc.uploadsPlaylistId) {
+    if (rows.length === 0 && offset === 0 && !q && yc.uploadsPlaylistId) {
       const hasAnyVideos = await db.query.videos.findFirst({
         where: eq(videos.channelId, yc.channelId),
         columns: { id: true },
@@ -225,18 +229,23 @@ export const getVideosForChannelHandle = createServerFn({ method: "GET" })
       }
     }
 
-    // If DB returned fewer than limit rows (or 0 rows on page > 0), check if YouTube has older videos to sync
-    if (rows.length <= limit && !q && yc.uploadsPlaylistId) {
-      const countRes = await db.execute(sql`
-        SELECT count(*)::int as total FROM "videos" WHERE "channel_id" = ${yc.channelId}
-      `);
-      const totalInDb = (countRes.rows[0] as any)?.total ?? 0;
-      const expectedTotal = parseInt(yc.videoCount, 10) || 0;
+    let currentToken: string | null | undefined = yc.nextPageToken;
+    const expectedTotal = parseInt(yc.videoCount, 10) || 0;
 
-      // When user reached beyond cached DB videos, fetch the next 50 from YouTube
-      if (rows.length === 0 && page * limit >= totalInDb && totalInDb < expectedTotal) {
+    const countRes = await db.execute(sql`
+      SELECT count(*)::int as total FROM "videos" WHERE "channel_id" = ${yc.channelId}
+    `);
+    let totalInDb = (countRes.rows[0] as any)?.total ?? 0;
+
+    let youtubeHasMore =
+      (currentToken !== null && currentToken !== undefined && currentToken !== "") ||
+      totalInDb < expectedTotal;
+
+    // If rows is 0 (we hit bottom of DB) OR (offset === 0 && rows < 20 for this filter, e.g. mostly shorts)
+    // and YouTube has more videos, fetch the next 50 items from YouTube!
+    if (rows.length <= limit && !q && yc.uploadsPlaylistId && youtubeHasMore) {
+      if (rows.length === 0 || (offset === 0 && rows.length < 20)) {
         try {
-          let currentToken: string | null | undefined = yc.nextPageToken;
           if (!currentToken) {
             const firstPageRes = await syncChannelVideosBoundedInternal({
               channelId: yc.channelId,
@@ -247,13 +256,25 @@ export const getVideosForChannelHandle = createServerFn({ method: "GET" })
           }
 
           if (currentToken) {
-            await syncChannelVideosBoundedInternal({
+            const syncRes = await syncChannelVideosBoundedInternal({
               channelId: yc.channelId,
               uploadsPlaylistId: yc.uploadsPlaylistId,
               limit: 50,
               pageToken: currentToken,
             });
+            currentToken = syncRes.nextPageToken;
+
+            // Re-query database with new items inserted
             rows = await queryPage();
+
+            // Re-check count in DB
+            const updatedCount = await db.execute(sql`
+              SELECT count(*)::int as total FROM "videos" WHERE "channel_id" = ${yc.channelId}
+            `);
+            totalInDb = (updatedCount.rows[0] as any)?.total ?? 0;
+            youtubeHasMore =
+              (currentToken !== null && currentToken !== undefined && currentToken !== "") ||
+              totalInDb < expectedTotal;
           }
         } catch (syncOlderErr: unknown) {
           console.error(`[SyncOlderVideos] Error syncing older videos for ${yc.channelId}:`, syncOlderErr);
@@ -261,7 +282,10 @@ export const getVideosForChannelHandle = createServerFn({ method: "GET" })
       }
     }
 
-    const hasMore = rows.length > limit;
+    const dbHasMore = rows.length > limit;
+    const canFetchMore = !q && Boolean(yc.uploadsPlaylistId) && youtubeHasMore;
+    const hasMore = dbHasMore || canFetchMore;
+
     const pageRows = rows.slice(0, limit);
 
     const mapped = pageRows

@@ -55,7 +55,7 @@ export const Route = createFileRoute("/channels")({
       fetchChannelByHandle({ data: handle }),
       tab !== "playlists"
         ? getVideosForChannelHandle({
-            data: { handle, isShort: tab === "shorts", page: 0, limit: 50 },
+            data: { handle, isShort: tab === "shorts", offset: 0, limit: 50 },
           })
         : Promise.resolve({ videos: [], hasMore: false }),
       tab === "playlists"
