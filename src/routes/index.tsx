@@ -5,7 +5,8 @@ import { z } from "zod";
 import { fetchFeedForUser } from "#/actions/feed";
 import { getUserChannels } from "#/actions/channels";
 import { getWatchedVideoIds } from "#/actions/history";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
 import {
   IconLoader,
   IconSearch,
@@ -71,99 +72,91 @@ function Dashboard() {
   } = Route.useLoaderData();
 
   const navigate = useNavigate({ from: "/" });
-  const [videos, setVideos] = useState(initialVideos);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(initialHasMore);
-  const [isFetchingMore, setIsFetchingMore] = useState(false);
   const observerTarget = useRef<HTMLDivElement>(null);
   const [selectedChannelIds, setSelectedChannelIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState(initialQ);
+  const [debouncedQuery, setDebouncedQuery] = useState(initialQ);
 
   // Update URL search query
   useEffect(() => {
     const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
       navigate({
         search: (prev) => ({ ...prev, q: searchQuery || undefined }),
       });
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, navigate]);
 
-  // Sync state if loader data changes
-  useEffect(() => {
-    setVideos(initialVideos);
-    setHasMore(initialHasMore);
-    setPage(0);
-    setSelectedChannelIds([]);
-  }, [initialVideos, initialHasMore]);
-
-  const fetchFilteredFeed = useCallback(
-    async (channelIds: string[], query?: string) => {
-      setIsFetchingMore(true);
-      try {
-        const result = await fetchFeedForUser({
-          data: {
-            page: 0,
-            q: query || undefined,
-            channelIds: channelIds.length > 0 ? channelIds : undefined,
-          },
-        });
-        setVideos(result.videos);
-        setPage(0);
-        setHasMore(result.hasMore);
-      } catch (err) {
-        console.error("[Dashboard] Error fetching filtered feed:", err);
-      } finally {
-        setIsFetchingMore(false);
-      }
-    },
-    [],
-  );
-
-  const toggleChannel = (id: string) => {
-    const nextChannels = selectedChannelIds.includes(id)
-      ? selectedChannelIds.filter((i) => i !== id)
-      : [...selectedChannelIds, id];
-    setSelectedChannelIds(nextChannels);
-    fetchFilteredFeed(nextChannels, searchQuery);
-  };
-
-  const handleResetChannels = () => {
-    setSelectedChannelIds([]);
-    fetchFilteredFeed([], searchQuery);
-  };
-
-  const loadMore = useCallback(async () => {
-    if (isFetchingMore || !hasMore) return;
-
-    setIsFetchingMore(true);
-    try {
-      const nextPage = page + 1;
-      const result = await fetchFeedForUser({
+  const {
+    data: feedData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: [
+      "feed",
+      {
+        channelIds: selectedChannelIds.slice().sort(),
+        q: debouncedQuery,
+      },
+    ],
+    queryFn: async ({ pageParam = 0 }) => {
+      return await fetchFeedForUser({
         data: {
-          page: nextPage,
-          q: searchQuery || undefined,
+          page: pageParam,
+          q: debouncedQuery || undefined,
           channelIds:
             selectedChannelIds.length > 0 ? selectedChannelIds : undefined,
         },
       });
-      if (result && result.videos.length > 0) {
-        setVideos((prev: any[]) => [...prev, ...result.videos]);
-        setPage(nextPage);
-        setHasMore(result.hasMore);
-      } else {
-        setHasMore(false);
-      }
-    } catch (err) {
-      console.error("[Dashboard] Error loading more videos:", err);
-    } finally {
-      setIsFetchingMore(false);
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      if (!lastPage || !lastPage.hasMore) return undefined;
+      return allPages.length;
+    },
+    placeholderData: keepPreviousData,
+    staleTime: 1000 * 60 * 5,
+    initialData:
+      selectedChannelIds.length === 0 && debouncedQuery === initialQ && initialVideos?.length
+        ? {
+            pages: [
+              {
+                videos: initialVideos,
+                hasMore: initialHasMore,
+              },
+            ],
+            pageParams: [0],
+          }
+        : undefined,
+  });
+
+  const videos = useMemo(() => {
+    if (feedData?.pages) {
+      return feedData.pages.flatMap((page) => page.videos);
     }
-  }, [page, hasMore, isFetchingMore, searchQuery, selectedChannelIds]);
+    return initialVideos;
+  }, [feedData, initialVideos]);
+
+  const toggleChannel = (id: string) => {
+    setSelectedChannelIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+    );
+  };
+
+  const handleResetChannels = () => {
+    setSelectedChannelIds([]);
+  };
+
+  const loadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   useEffect(() => {
-    // Only observe if there is more to fetch, we're not currently fetching, and we have items
-    if (!hasMore || isFetchingMore || videos.length === 0) return;
+    if (!hasNextPage || isFetchingNextPage || videos.length === 0) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -180,7 +173,7 @@ function Dashboard() {
     }
 
     return () => observer.disconnect();
-  }, [loadMore, hasMore, isFetchingMore, videos.length]);
+  }, [loadMore, hasNextPage, isFetchingNextPage, videos.length]);
 
   // If the user has NOT followed any channels yet (True Subscription Check)
   if (!followedChannels || followedChannels.length === 0) {
@@ -350,9 +343,9 @@ function Dashboard() {
         <div
           ref={observerTarget}
           className="w-full py-12 flex items-center justify-center"
-          style={{ opacity: hasMore ? 1 : 0 }}
+          style={{ opacity: hasNextPage ? 1 : 0 }}
         >
-          {isFetchingMore && (
+          {isFetchingNextPage && (
             <div className="flex items-center gap-3 text-muted-foreground animate-in fade-in slide-in-from-bottom-2">
               <IconLoader className="animate-spin" size={20} />
               <span className="text-sm font-medium">

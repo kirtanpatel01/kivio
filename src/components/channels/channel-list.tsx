@@ -2,24 +2,76 @@ import { IconCheck, IconPencil, IconTrash, IconX } from "@tabler/icons-react";
 import type { channels } from "#/db/schema";
 import { useState } from "react";
 import { fetchChannelByHandle } from "#/actions/channel";
-import { removeUserChannel, updateUserChannel } from "#/actions/channels";
+import {
+  getUserChannels,
+  removeUserChannel,
+  updateUserChannel,
+} from "#/actions/channels";
 import ChannelInput from "./channel-input";
-import { getRouteApi, useRouter } from "@tanstack/react-router";
+import { getRouteApi } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 type Channel = typeof channels.$inferSelect;
 
 const routeApi = getRouteApi("/channels");
 
 export default function ChannelList({ channels }: { channels: Channel[] }) {
+  const queryClient = useQueryClient();
   const [editingName, setEditingName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const router = useRouter();
 
   const { handle } = routeApi.useSearch();
   const navigate = routeApi.useNavigate();
+
+  const { data: userChannels = channels } = useQuery<Channel[]>({
+    queryKey: ["userChannels"],
+    queryFn: () => getUserChannels(),
+    initialData: channels,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => removeUserChannel({ data: id }),
+    onMutate: async (deletedId) => {
+      await queryClient.cancelQueries({ queryKey: ["userChannels"] });
+      const previousChannels = queryClient.getQueryData<Channel[]>(["userChannels"]);
+      queryClient.setQueryData<Channel[]>(["userChannels"], (old) =>
+        old ? old.filter((c) => c.id !== deletedId) : [],
+      );
+      return { previousChannels };
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previousChannels) {
+        queryClient.setQueryData(["userChannels"], context.previousChannels);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["userChannels"] });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, handle }: { id: string; handle: string }) => {
+      await fetchChannelByHandle({ data: handle });
+      return await updateUserChannel({ data: { id, handle } });
+    },
+    onMutate: async ({ id, handle: newHandle }) => {
+      await queryClient.cancelQueries({ queryKey: ["userChannels"] });
+      const previousChannels = queryClient.getQueryData<Channel[]>(["userChannels"]);
+      queryClient.setQueryData<Channel[]>(["userChannels"], (old) =>
+        old ? old.map((c) => (c.id === id ? { ...c, handle: newHandle } : c)) : [],
+      );
+      return { previousChannels };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousChannels) {
+        queryClient.setQueryData(["userChannels"], context.previousChannels);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["userChannels"] });
+    },
+  });
 
   const startEdit = (channel: Channel) => {
     setEditingId(channel.id);
@@ -35,32 +87,27 @@ export default function ChannelList({ channels }: { channels: Channel[] }) {
     value.trim().startsWith("@") ? value.trim() : `@${value.trim()}`;
 
   const handleSaveEdit = async () => {
-    if (saving || !editingId || !editingName.trim()) return;
+    if (updateMutation.isPending || !editingId || !editingName.trim()) return;
     const normalized = normalizeHandle(editingName);
     try {
-      setSaving(true);
-      await fetchChannelByHandle({ data: normalized });
-      await updateUserChannel({ data: { id: editingId, handle: normalized } });
+      await updateMutation.mutateAsync({ id: editingId, handle: normalized });
       handleCancelEdit();
     } catch (err: unknown) {
       console.error(err);
-    } finally {
-      setSaving(false);
     }
   };
 
-  const handleDelete = async (channel: Channel) => {
-    try {
-      setDeleting(true);
-      setDeletingId(channel.id);
-      await removeUserChannel({ data: channel.id });
-      router.invalidate();
-    } catch (err: unknown) {
-      console.error(err);
-    } finally {
-      setDeleting(false);
-      setDeletingId(null);
+  const handleDelete = (channel: Channel) => {
+    const remaining = (userChannels || []).filter((c) => c.id !== channel.id);
+    if (handle === channel.handle) {
+      navigate({
+        search: (prev) => ({
+          ...prev,
+          handle: remaining[0]?.handle || undefined,
+        }),
+      });
     }
+    deleteMutation.mutate(channel.id);
   };
 
   return (
@@ -69,7 +116,7 @@ export default function ChannelList({ channels }: { channels: Channel[] }) {
         {/* Channels List */}
         <ChannelInput />
         <div className="space-y-1">
-          {channels.length === 0 ? (
+          {userChannels.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center space-y-2 opacity-50">
               <p className="text-sm font-medium">No channels added yet.</p>
               <p className="text-xs text-muted-foreground">
@@ -77,7 +124,7 @@ export default function ChannelList({ channels }: { channels: Channel[] }) {
               </p>
             </div>
           ) : (
-            channels.map((channel) => (
+            userChannels.map((channel) => (
               <div
                 key={channel.id}
                 className={`flex items-center justify-between p-2 rounded-lg cursor-pointer ${
@@ -107,10 +154,10 @@ export default function ChannelList({ channels }: { channels: Channel[] }) {
                           e.stopPropagation();
                           handleSaveEdit();
                         }}
-                        disabled={saving}
+                        disabled={updateMutation.isPending}
                         className="px-2 bg-secondary hover:bg-secondary/80 rounded-full cursor-pointer disabled:opacity-50"
                       >
-                        {saving ? (
+                        {updateMutation.isPending ? (
                           <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
                         ) : (
                           <IconCheck size={16} />
@@ -147,10 +194,10 @@ export default function ChannelList({ channels }: { channels: Channel[] }) {
                           e.stopPropagation();
                           handleDelete(channel);
                         }}
-                        disabled={deleting}
+                        disabled={deleteMutation.isPending}
                         className="p-1.5 bg-primary/40 hover:bg-primary/60 text-primary-foreground rounded-md cursor-pointer disabled:opacity-50"
                       >
-                        {deleting && deletingId === channel.id ? (
+                        {deleteMutation.isPending && deleteMutation.variables === channel.id ? (
                           <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                         ) : (
                           <IconTrash size={14} />

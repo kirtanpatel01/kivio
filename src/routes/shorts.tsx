@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { fetchShortsForUser } from "#/actions/feed";
 import ShortVideo from "#/components/short-video";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
 import {
   IconLoader,
   IconChevronUp,
@@ -33,13 +34,50 @@ function ShortsPage() {
   const { v: currentVideoId } = Route.useSearch();
   const navigate = Route.useNavigate();
 
-  const [videos, setVideos] = useState(initialVideos);
-  const [hasMore, setHasMore] = useState(loaderData?.hasMore || false);
-  const [isFetchingMore, setIsFetchingMore] = useState(false);
-  const [page, setPage] = useState(0);
-
   const containerRef = useRef<HTMLDivElement>(null);
   const observerTarget = useRef<HTMLDivElement>(null);
+
+  const {
+    data: shortsData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["shorts-feed"],
+    queryFn: async ({ pageParam = 0 }) => {
+      return await fetchShortsForUser({
+        data: {
+          page: pageParam,
+          currentVideoId: pageParam === 0 ? currentVideoId : undefined,
+        },
+      });
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      if (!lastPage || !lastPage.hasMore) return undefined;
+      return allPages.length;
+    },
+    placeholderData: keepPreviousData,
+    staleTime: 1000 * 60 * 5,
+    initialData: initialVideos.length
+      ? {
+          pages: [
+            {
+              videos: initialVideos,
+              hasMore: loaderData?.hasMore || false,
+            },
+          ],
+          pageParams: [0],
+        }
+      : undefined,
+  });
+
+  const videos = useMemo(() => {
+    if (shortsData?.pages) {
+      return shortsData.pages.flatMap((page) => page.videos);
+    }
+    return initialVideos;
+  }, [shortsData, initialVideos]);
 
   const [activeId, setActiveId] = useState<string | null>(() => {
     if (currentVideoId) return currentVideoId;
@@ -48,26 +86,11 @@ function ShortsPage() {
     return null;
   });
 
-  const loadMore = useCallback(async () => {
-    if (isFetchingMore || !hasMore) return;
-
-    setIsFetchingMore(true);
-    try {
-      const nextPage = page + 1;
-      const result = await fetchShortsForUser({ data: { page: nextPage } });
-      if (result && result.videos.length > 0) {
-        setVideos((prev) => [...prev, ...result.videos]);
-        setPage(nextPage);
-        setHasMore(result.hasMore);
-      } else {
-        setHasMore(false);
-      }
-    } catch (err) {
-      console.error("[Shorts] Error loading more:", err);
-    } finally {
-      setIsFetchingMore(false);
+  const loadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
     }
-  }, [page, hasMore, isFetchingMore]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Handle URL changes (e.g. from back/forward buttons)
   useEffect(() => {
@@ -189,7 +212,7 @@ function ShortsPage() {
           ref={observerTarget}
           className="h-20 flex items-center justify-center"
         >
-          {isFetchingMore && (
+          {isFetchingNextPage && (
             <IconLoader className="animate-spin text-primary" size={32} />
           )}
         </div>

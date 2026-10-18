@@ -18,6 +18,11 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import {
+  useInfiniteQuery,
+  keepPreviousData,
+  useQueryClient,
+} from "@tanstack/react-query";
 import VideoCard from "#/components/video-card";
 import Avatar from "#/components/Avatar";
 import VideoThumbnail from "#/components/VideoThumbnail";
@@ -50,92 +55,95 @@ export default function ChannelDetails() {
     };
 
   const router = useRouter();
-  const [videos, setVideos] = useState<YouTubeVideo[]>(channelVideos ?? []);
-  const [hasMore, setHasMore] = useState(initialHasMore ?? false);
-  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const queryClient = useQueryClient();
   const [syncedCount, setSyncedCount] = useState<number>(initialTotalInDb ?? (channelVideos?.length ?? 0));
   const [isAllSyncedState, setIsAllSyncedState] = useState<boolean>(initialIsAllSynced ?? false);
   const [isSyncingAll, setIsSyncingAll] = useState(false);
   const stopSyncRef = useRef(false);
   const observerTarget = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Sync state if loader data, handle, or tab changes
+  // Debounce search query
   useEffect(() => {
-    setVideos(channelVideos ?? []);
-    setHasMore(initialHasMore ?? false);
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Infinite query for channel videos across tabs with caching
+  const {
+    data: videosData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["channel-videos", handle, tab, debouncedQuery],
+    queryFn: async ({ pageParam = 0 }) => {
+      return await getVideosForChannelHandle({
+        data: {
+          handle: handle!,
+          isShort: tab === "shorts",
+          offset: pageParam,
+          limit: 50,
+          q: debouncedQuery || undefined,
+        },
+      });
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      if (!lastPage || !lastPage.hasMore) return undefined;
+      const loadedCount = allPages.flatMap((p) => p.videos).length;
+      return loadedCount;
+    },
+    enabled: !!handle && tab !== "playlists",
+    placeholderData: keepPreviousData,
+    staleTime: 1000 * 60 * 5,
+    initialData:
+      tab !== "playlists" && !debouncedQuery && channelVideos?.length
+        ? {
+            pages: [
+              {
+                videos: channelVideos,
+                hasMore: initialHasMore ?? false,
+                totalInDb: initialTotalInDb ?? 0,
+              },
+            ],
+            pageParams: [0],
+          }
+        : undefined,
+  });
+
+  const videos = useMemo(() => {
+    if (tab === "playlists") return [];
+    if (videosData?.pages) {
+      return videosData.pages.flatMap((page) => page.videos);
+    }
+    return channelVideos ?? [];
+  }, [videosData, channelVideos, tab]);
+
+  // Reset CHANNEL-LEVEL sync stats ONLY when the channel (handle) changes — never on tab switch
+  useEffect(() => {
     if (initialTotalInDb !== undefined) {
       setSyncedCount(initialTotalInDb);
     }
     if (initialIsAllSynced !== undefined) {
       setIsAllSyncedState(initialIsAllSynced);
     }
-    setSearchQuery("");
     setIsSyncingAll(false);
     stopSyncRef.current = true;
-  }, [channelVideos, initialHasMore, initialTotalInDb, initialIsAllSynced, handle, tab]);
+  }, [handle, initialTotalInDb, initialIsAllSynced]);
 
-  // Server-side search debounce for channel videos
-  useEffect(() => {
-    if (tab === "playlists" || !handle) return;
-    const timer = setTimeout(async () => {
-      setIsFetchingMore(true);
-      try {
-        const res = await getVideosForChannelHandle({
-          data: {
-            handle,
-            isShort: tab === "shorts",
-            offset: 0,
-            limit: 50,
-            q: searchQuery || undefined,
-          },
-        });
-        setVideos(res.videos);
-        setHasMore(res.hasMore);
-      } catch (err) {
-        console.error("[ChannelDetails] Search error:", err);
-      } finally {
-        setIsFetchingMore(false);
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery, handle, tab]);
-
-  const loadMore = useCallback(async () => {
-    if (isFetchingMore || !hasMore || tab === "playlists" || !handle) return;
-
-    setIsFetchingMore(true);
-    try {
-      const res = await getVideosForChannelHandle({
-        data: {
-          handle,
-          isShort: tab === "shorts",
-          offset: videos.length,
-          limit: 50,
-          q: searchQuery || undefined,
-        },
-      });
-
-      if (res && res.videos && res.videos.length > 0) {
-        setVideos((prev) => {
-          const existingIds = new Set(prev.map((v) => v.id));
-          const fresh = res.videos.filter((v) => !existingIds.has(v.id));
-          return [...prev, ...fresh];
-        });
-        setHasMore(res.hasMore);
-      } else {
-        setHasMore(res?.hasMore ?? false);
-      }
-    } catch (err) {
-      console.error("[ChannelDetails] Error loading more videos:", err);
-    } finally {
-      setIsFetchingMore(false);
+  const loadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage && tab !== "playlists" && !!handle) {
+      fetchNextPage();
     }
-  }, [isFetchingMore, hasMore, tab, handle, videos.length, searchQuery]);
+  }, [hasNextPage, isFetchingNextPage, tab, handle, fetchNextPage]);
 
   useEffect(() => {
-    if (!hasMore || isFetchingMore || tab === "playlists") return;
+    if (!hasNextPage || isFetchingNextPage || tab === "playlists") return;
 
     // 1. Intersection Observer with threshold 0 and rootMargin to trigger before hitting the bottom
     const observer = new IntersectionObserver(
@@ -172,13 +180,18 @@ export default function ChannelDetails() {
         container.removeEventListener("scroll", onScroll);
       }
     };
-  }, [loadMore, hasMore, isFetchingMore, tab]);
+  }, [loadMore, hasNextPage, isFetchingNextPage, tab]);
 
   const handleSync = async () => {
     if (!details?.id || isSyncing) return;
     try {
       setIsSyncing(true);
       await syncChannelNow({ data: details.id });
+      if (handle) {
+        await queryClient.invalidateQueries({
+          queryKey: ["channel-videos", handle],
+        });
+      }
       await router.invalidate();
     } catch (err) {
       console.error("[ChannelDetails] Sync failed:", err);
@@ -206,19 +219,11 @@ export default function ChannelDetails() {
         await new Promise((resolve) => setTimeout(resolve, 150));
       }
 
-      // Re-fetch the current tab's videos so newly synced videos appear immediately
+      // Re-fetch the channel videos in TanStack Query so newly synced videos appear immediately
       if (handle) {
-        const updated = await getVideosForChannelHandle({
-          data: {
-            handle,
-            isShort: tab === "shorts",
-            offset: 0,
-            limit: 50,
-            q: searchQuery || undefined,
-          },
+        await queryClient.invalidateQueries({
+          queryKey: ["channel-videos", handle],
         });
-        setVideos(updated.videos);
-        setHasMore(updated.hasMore);
       }
     } catch (err) {
       console.error("[ChannelDetails] Sync All error:", err);
@@ -579,17 +584,17 @@ export default function ChannelDetails() {
               ref={observerTarget}
               className="w-full py-12 flex flex-col items-center justify-center gap-2"
             >
-              {isFetchingMore ? (
+              {isFetchingNextPage ? (
                 <div className="flex items-center gap-2.5 text-muted-foreground animate-in fade-in">
                   <IconLoader className="animate-spin text-primary" size={20} />
                   <span className="text-sm font-medium">
                     Loading more videos...
                   </span>
                 </div>
-              ) : hasMore ? (
+              ) : hasNextPage ? (
                 <button
                   onClick={loadMore}
-                  disabled={isFetchingMore}
+                  disabled={isFetchingNextPage}
                   className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-xl text-xs font-bold transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98] border border-primary/20"
                 >
                   <IconRefresh size={14} />

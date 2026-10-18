@@ -1,9 +1,10 @@
 import { Link } from "@tanstack/react-router";
-import { recordHistory } from "#/actions/history";
+import { recordHistory, getWatchedVideoIds } from "#/actions/history";
 import { IconHistory } from "@tabler/icons-react";
 import { getTimeAgo } from "#/lib/utils";
 import type { YouTubeVideo } from "#/types";
 import VideoThumbnail from "#/components/VideoThumbnail";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 
 interface SuggestionCardProps {
   video: YouTubeVideo;
@@ -14,11 +15,25 @@ export default function SuggestionCard({
   video,
   isWatched,
 }: SuggestionCardProps) {
+  const queryClient = useQueryClient();
+
+  const { data: watchedVideoIds } = useQuery({
+    queryKey: ["watchedVideoIds"],
+    queryFn: () => getWatchedVideoIds(),
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const isVideoWatched =
+    isWatched || (watchedVideoIds ? watchedVideoIds.includes(video.id) : false);
+
   return (
     <Link
       to={`/videos/$videoId`}
       params={{ videoId: video.id }}
       onClick={() => {
+        queryClient.setQueryData<string[]>(["watchedVideoIds"], (old) =>
+          old ? (old.includes(video.id) ? old : [...old, video.id]) : [video.id],
+        );
         recordHistory({
           data: {
             videoId: video.id,
@@ -28,7 +43,11 @@ export default function SuggestionCard({
             duration: video.duration,
             viewCount: video.viewCount,
           },
-        }).catch((e) => console.error(e));
+        })
+          .then(() => {
+            queryClient.invalidateQueries({ queryKey: ["history"] });
+          })
+          .catch((e) => console.error(e));
       }}
     >
       <div className="group flex gap-3 cursor-pointer p-2 rounded-xl hover:bg-secondary/40 border border-transparent hover:border-border/10">
@@ -40,7 +59,7 @@ export default function SuggestionCard({
             alt={video.title}
             className="w-full h-full object-cover group-hover:scale-105"
           />
-          {isWatched && (
+          {isVideoWatched && (
             <div className="absolute top-1.5 right-1.5 p-1 bg-black/60 backdrop-blur-md rounded-full text-white z-30 shadow-md">
               <IconHistory size={11} className="text-primary" />
             </div>

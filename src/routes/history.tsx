@@ -5,8 +5,9 @@ import {
   IconX,
   IconLoader,
 } from "@tabler/icons-react";
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getHistory, deleteHistoryItem, clearHistory } from "#/actions/history";
 import { getTimeAgo } from "#/lib/utils";
 import { authClient } from "#/lib/auth-client";
@@ -63,10 +64,66 @@ function ErrorState({ error }: { error: any }) {
 
 function RouteComponent() {
   const { initialHistory, isLoggedIn } = Route.useLoaderData();
-  const [history, setHistory] = useState(initialHistory);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
+
+  const { data: history = initialHistory } = useQuery({
+    queryKey: ["history"],
+    queryFn: () => getHistory(),
+    initialData: initialHistory,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteHistoryItem({ data: id }),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["history"] });
+      const previousHistory = queryClient.getQueryData<any[]>(["history"]);
+      const itemToDelete = previousHistory?.find((h) => h.id === id);
+
+      queryClient.setQueryData<any[]>(["history"], (old) =>
+        old ? old.filter((h) => h.id !== id) : [],
+      );
+
+      if (itemToDelete?.videoId) {
+        queryClient.setQueryData<string[]>(["watchedVideoIds"], (old) =>
+          old ? old.filter((vId) => vId !== itemToDelete.videoId) : [],
+        );
+      }
+
+      return { previousHistory };
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previousHistory) {
+        queryClient.setQueryData(["history"], context.previousHistory);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["history"] });
+      queryClient.invalidateQueries({ queryKey: ["watchedVideoIds"] });
+    },
+  });
+
+  const clearMutation = useMutation({
+    mutationFn: () => clearHistory(),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["history"] });
+      const previousHistory = queryClient.getQueryData<any[]>(["history"]);
+      queryClient.setQueryData<any[]>(["history"], []);
+      queryClient.setQueryData<string[]>(["watchedVideoIds"], []);
+      return { previousHistory };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousHistory) {
+        queryClient.setQueryData(["history"], context.previousHistory);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["history"] });
+      queryClient.invalidateQueries({ queryKey: ["watchedVideoIds"] });
+    },
+  });
 
   const authenticated = isLoggedIn || !!session;
 
@@ -93,27 +150,15 @@ function RouteComponent() {
       item.channelTitle.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const removeItem = async (id: string, e: React.MouseEvent) => {
+  const removeItem = (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    try {
-      await deleteHistoryItem({ data: id });
-      setHistory(history.filter((h) => h.id !== id));
-      router.invalidate();
-    } catch (err) {
-      console.error(err);
-    }
+    deleteMutation.mutate(id);
   };
 
-  const clearAll = async () => {
+  const clearAll = () => {
     if (confirm("Are you sure you want to clear your entire watch history?")) {
-      try {
-        await clearHistory();
-        setHistory([]);
-        router.invalidate();
-      } catch (err) {
-        console.error(err);
-      }
+      clearMutation.mutate();
     }
   };
 

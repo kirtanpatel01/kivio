@@ -1,9 +1,10 @@
-import { recordHistory } from "#/actions/history";
+import { recordHistory, getWatchedVideoIds } from "#/actions/history";
 import { IconHistory } from "@tabler/icons-react";
 import type { YouTubeVideo } from "#/types";
 import { getTimeAgo } from "#/lib/utils";
 import Avatar from "#/components/Avatar";
 import VideoThumbnail from "#/components/VideoThumbnail";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 
 function VideoCard({
   video,
@@ -12,9 +13,24 @@ function VideoCard({
   video: YouTubeVideo;
   isWatched?: boolean;
 }) {
+  const queryClient = useQueryClient();
   const publishedAt = new Date(video.publishedAt);
 
+  const { data: watchedVideoIds } = useQuery({
+    queryKey: ["watchedVideoIds"],
+    queryFn: () => getWatchedVideoIds(),
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const isVideoWatched =
+    isWatched || (watchedVideoIds ? watchedVideoIds.includes(video.id) : false);
+
   const handleRecordHistory = () => {
+    // Optimistically mark video as watched in query cache immediately
+    queryClient.setQueryData<string[]>(["watchedVideoIds"], (old) =>
+      old ? (old.includes(video.id) ? old : [...old, video.id]) : [video.id],
+    );
+
     recordHistory({
       data: {
         videoId: video.id,
@@ -24,7 +40,11 @@ function VideoCard({
         duration: video.duration,
         viewCount: video.viewCount,
       },
-    }).catch((err) => console.error("History recording failed", err));
+    })
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["history"] });
+      })
+      .catch((err) => console.error("History recording failed", err));
   };
 
   return (
@@ -42,7 +62,7 @@ function VideoCard({
           alt={video.title}
           className="w-full h-full object-cover group-hover:scale-[1.01] z-20 transition-all duration-500"
         />
-        {isWatched && (
+        {isVideoWatched && (
           <div className="absolute top-2 right-2 p-1.5 bg-black/60 backdrop-blur-md rounded-full text-white z-30 shadow-lg border border-white/10">
             <IconHistory size={14} className="text-primary" />
           </div>

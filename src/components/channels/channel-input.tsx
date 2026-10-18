@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useRouter } from "@tanstack/react-router";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { IconPlus } from "@tabler/icons-react";
 import { addUserChannel } from "#/actions/channels";
 
 function ChannelInput() {
   const [newChannelName, setNewChannelName] = useState("");
-  const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const normalizeHandle = (value: string) => {
     const trimmed = value.trim();
@@ -15,26 +16,26 @@ function ChannelInput() {
     return trimmed.startsWith("@") ? trimmed : `@${trimmed}`;
   };
 
-  const handleAdd = async () => {
-    const normalized = normalizeHandle(newChannelName);
-    if (!normalized) return;
-    try {
-      setAdding(true);
-      setError(null);
-      // addUserChannel fetches metadata, saves to DB, and awaits the initial 50 videos
-      await addUserChannel({ data: normalized });
-
+  const addChannelMutation = useMutation({
+    mutationFn: (handle: string) => addUserChannel({ data: handle }),
+    onSuccess: async (_, normalizedHandle) => {
       setNewChannelName("");
-      await router.invalidate();
+      await queryClient.invalidateQueries({ queryKey: ["userChannels"] });
       router.navigate({
         to: "/channels",
-        search: { handle: normalized, tab: "videos" },
+        search: { handle: normalizedHandle, tab: "videos" },
       });
-    } catch (err: unknown) {
-      setError((err as Error).message || "Failed to add channel");
-    } finally {
-      setAdding(false);
-    }
+    },
+    onError: (err: Error) => {
+      setError(err.message || "Failed to add channel");
+    },
+  });
+
+  const handleAdd = () => {
+    const normalized = normalizeHandle(newChannelName);
+    if (!normalized || addChannelMutation.isPending) return;
+    setError(null);
+    addChannelMutation.mutate(normalized);
   };
 
   return (
@@ -52,14 +53,14 @@ function ChannelInput() {
           value={newChannelName}
           onChange={(e) => setNewChannelName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-          disabled={adding}
+          disabled={addChannelMutation.isPending}
         />
         <button
           onClick={handleAdd}
-          disabled={adding}
+          disabled={addChannelMutation.isPending}
           className="px-3 py-2 bg-secondary/70 hover:bg-secondary rounded-lg cursor-pointer disabled:cursor-not-allowed flex items-center justify-center min-w-[40px]"
         >
-          {adding ? (
+          {addChannelMutation.isPending ? (
             <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
           ) : (
             <IconPlus size={16} />

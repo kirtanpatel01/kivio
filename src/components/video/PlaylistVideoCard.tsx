@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { recordHistory } from "#/actions/history";
 import type { YouTubeVideo } from "#/types";
 import VideoThumbnail from "#/components/VideoThumbnail";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface PlaylistVideoCardProps {
   video: YouTubeVideo;
@@ -16,6 +17,8 @@ export default function PlaylistVideoCard({
   index,
   playlistId,
 }: PlaylistVideoCardProps) {
+  const queryClient = useQueryClient();
+
   return (
     <Link
       to={`/videos/$videoId`}
@@ -27,6 +30,9 @@ export default function PlaylistVideoCard({
           : "hover:bg-secondary/40 border-transparent hover:border-border/10"
       }`}
       onClick={() => {
+        queryClient.setQueryData<string[]>(["watchedVideoIds"], (old) =>
+          old ? (old.includes(video.id) ? old : [...old, video.id]) : [video.id],
+        );
         recordHistory({
           data: {
             videoId: video.id,
@@ -36,7 +42,11 @@ export default function PlaylistVideoCard({
             duration: video.duration,
             viewCount: video.viewCount,
           },
-        }).catch((e) => console.error(e));
+        })
+          .then(() => {
+            queryClient.invalidateQueries({ queryKey: ["history"] });
+          })
+          .catch((e) => console.error(e));
       }}
     >
       <div className="relative w-28 aspect-video rounded-lg overflow-hidden shrink-0 bg-secondary/20">
